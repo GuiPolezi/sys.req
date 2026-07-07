@@ -37,3 +37,25 @@ RC03 - O suporte se cadastra normalmente.
 RC04 - O desenvolvedor se cadastra normalmente
 RC05 - O Solicitante só pode efetuar seu cadastro com um codigo fornecido pelo suporte.
 RC06 - O Solicitante tambem deve informar sua cidade no cadastro
+RC07 - Os usuarios do sistema devem conseguir visualizar seus proprios perfis
+
+## Requisitos de Permissões
+RP01 - O sistema deve permitir o suporte criar grupos
+RP02 - O sistema deve permitir o suporte convidar usuarios para o grupo
+RP03 - Grupos servirão para distinguir informações do sistema
+RP04 - Cada grupo possui seu proprio "organismo" - Ou seja, se o usuario acessa o sistema sem estar em um grupo, ele não vê nada, além de seu perfil e configurações pessoais.
+RP05 - Usuarios do grupo, com exceção do solicitante, devem conseguir visualizar todos os integrantes do grupo
+RP06 - O usuario desenvolvedor deve ser capaz de aceitar ou recusar convites de grupos
+RP07 - Para os técnicos: Suporte e Desenvolvedor, o grupo deve permiti-los realizarem criações, exclusões e edições.
+RP08 - Informações do grupo são extritamente restritas a apenas aquele grupo, ou seja, os grupos são distintos em informações.
+RP09 - O cadastro do grupo tem apenas o campo Nome do grupo e Descrição
+RP10 - Suporte e desenvolvedor podem participar de varios grupos diferentes
+RP11 - O usuario deve conseguir alternar entre seus grupos, mudando assim as informações que ele vê.
+RP12 - O usuario, com exceção do solicitante, deve conseguir sair de um grupo se quiser
+RP13 - Apenas suporte pode apagar um grupo, depois de passar por varias mensagens de aviso.
+RP14 - No grupo, o suporte deve conseguir criar Categorias do usuario Desenvolvedor. Para que seja possivel definir se aquele usuario faz parte de Desenvolvimento web, desktop, etc...
+RP15 - O desenvolvedor deve conseguir escolher qual categoria ele pertence. O suporte deve conseguir atribuir tambem aos desenvolvedores
+RP16 - O sistema deve fornecer um log de auditoria de cada movimentação realizada no grupo.
+
+
+##
