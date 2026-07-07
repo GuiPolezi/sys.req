@@ -26,3 +26,14 @@ Escrevendo em formato de rascunho para elaborar corretamente depois
 23. O sistema deve ter categorias de desenvolvedor
 24. O desenvolvedor pode marcar tickets concluidos
 25. 
+
+
+# Categorizando Requisitos
+
+## Requisitos de Cadastro
+RC01 - O sistema deve ter cadastro e login de usuario
+RC02 - Os cadastros do sistema são dividos em 3 tipos: Suporte, desenvolvedor, solicitante
+RC03 - O suporte se cadastra normalmente.
+RC04 - O desenvolvedor se cadastra normalmente
+RC05 - O Solicitante só pode efetuar seu cadastro com um codigo fornecido pelo suporte.
+RC06 - O Solicitante tambem deve informar sua cidade no cadastro
