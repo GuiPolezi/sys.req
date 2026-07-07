@@ -18,4 +18,11 @@ Escrevendo em formato de rascunho para elaborar corretamente depois
 15. O solicitante consegue solicitar urgencia no ticket, para alertar o desenvolvedor
 16. O desenvolvedor vê painel dashboard com diversas informações de tickets
 17. O desenvolvedor pode criar ticket
-18. O desenvolver pode escolher atribuir a si um ticket que não esta 
+18. O desenvolver pode escolher atribuir a si um ticket que não esta atribuido a ninguem
+19. Deve ser possivel deixar o ticket sem atribuição
+20. Tickets sem atribuição devem aparecer para todos os devs, em uma página especifica para isso (tipo dashboard)
+21. O desenvolver pode escolher visualizar apenas seus proprios tickets
+22. O sistema deve permitir configurar as categorias que o desenvolvedor atende
+23. O sistema deve ter categorias de desenvolvedor
+24. O desenvolvedor pode marcar tickets concluidos
+25. 
