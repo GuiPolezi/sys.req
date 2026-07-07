@@ -58,4 +58,10 @@ RP15 - O desenvolvedor deve conseguir escolher qual categoria ele pertence. O su
 RP16 - O sistema deve fornecer um log de auditoria de cada movimentação realizada no grupo.
 
 
-##
+## Requisitos de Conteudo do sistema
+RCS01 - O sistema deve permitir a criação de tickets
+RCS02 - O sistema deve permitir a interação por mensagem entre os tecnicos do grupo - Chat geral
+RCS03 - O sistema deve possuir um chat interno em cada ticket.
+RCS04 - O sistema deve permitir a criação de serviços para automatizar criação de tickets
+RCS05 - O sistema deve permitir que o solicitante envie um alerta de pedido de urgencia no ticket.
+RCS06 - 
