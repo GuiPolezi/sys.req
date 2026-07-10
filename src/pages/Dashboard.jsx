@@ -1,9 +1,10 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ticketsVisibleTo, categoriesForGroup, STATUS, URGENCY } from '../lib/domain';
 import { db } from '../lib/store';
 import { StatusBadge, UrgencyBadge, Empty, timeAgo } from '../components/ui';
-import { ColumnChart, BarList, Donut } from '../components/Charts';
+import { AreaChart, BarList, Donut } from '../components/Charts';
 
 const pad = (n) => String(n).padStart(2, '0');
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -21,19 +22,20 @@ export default function Dashboard() {
   // atividade recente — mais recente (por criação) primeiro
   const recent = [...tickets].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 8);
 
-  // série: chamados criados nos últimos 14 dias
+  // série: chamados criados no período escolhido
+  const [period, setPeriod] = useState(30); // dias
   const today = new Date();
   const perDay = [];
-  for (let i = 13; i >= 0; i--) {
+  for (let i = period - 1; i >= 0; i--) {
     const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
     const key = ymd(d);
     perDay.push({
       label: pad(d.getDate()),
-      full: d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
+      full: d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }),
       value: tickets.filter((t) => t.createdAt.slice(0, 10) === key).length,
     });
   }
-  const created14 = perDay.reduce((s, d) => s + d.value, 0);
+  const createdInPeriod = perDay.reduce((s, d) => s + d.value, 0);
 
   // distribuição por status / urgência / categoria (dos chamados visíveis)
   const statusSeg = Object.entries(STATUS).map(([k, v]) => ({
@@ -70,12 +72,20 @@ export default function Dashboard() {
 
       {/* série temporal */}
       <div className="card card-pad mb">
-        <div className="row between">
-          <h3 style={{ margin: 0 }}>Chamados criados</h3>
-          <span className="muted small">últimos 14 dias · {created14} no período</span>
+        <div className="row between wrap" style={{ gap: 10 }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Chamados criados</h3>
+            <span className="muted small">{createdInPeriod} no período</span>
+          </div>
+          <select value={period} onChange={(e) => setPeriod(Number(e.target.value))} style={{ width: 'auto' }}>
+            <option value={7}>Últimos 7 dias</option>
+            <option value={14}>Últimos 14 dias</option>
+            <option value={30}>Últimos 30 dias</option>
+            <option value={90}>Últimos 90 dias</option>
+          </select>
         </div>
-        <div style={{ marginTop: 14 }}>
-          <ColumnChart data={perDay} />
+        <div style={{ marginTop: 8 }}>
+          <AreaChart data={perDay} />
         </div>
       </div>
 
