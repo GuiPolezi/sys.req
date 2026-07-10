@@ -1,0 +1,24 @@
+Testando versão 0.0.2 Atualizada
+
+
+Insights Geral:
+- Permitir adição de imagem de perfil para os usuários.l
+
+
+
+# Testes como Suporte
+
+- Mudança de Grupos e Criação está ok. Talvez possa ser melhorada a visualização para que o usuário não confunda em qual grupo ele está, isso é algo a ser pensado.
+
+
+Registro de atendimentos>
+- Campo cidade vem preenchido, fazer com que esse campo venha vazio
+
+
+Aparentemente, ok
+Para validar corretamente será necessário fazer um teste real de produção. O que irei fazer posteriormente.
+
+Por enquanto, então, quero alguns ajustes visuais. Sendo eles a remoção do preenchimento que vem automático no campo cidade e ajuste no painel.
+
+Com base no sistema atual, e todas as informações que temos e podemos obter, atualize o painel dashboard.
+Faça com que tenha gráficos, se possível gráficos em linha ou de coluna para uma visualização geral de informações e obtenção de insights. Transforme o painel em um dashboard mais profissional. Deixe que a atividade recente mostre na ordem decrescente de criação do ticket (Ou seja, o mais recente em primeiro).
