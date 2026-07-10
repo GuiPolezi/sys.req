@@ -27,7 +27,7 @@ export default function Dashboard() {
 
       <div className="stats mb">
         <div className="stat">
-          <div className="n" style={{ color: '#dc2626' }}>{urgent.length}</div>
+          <div className="n" style={{ color: '#C2542F' }}>{urgent.length}</div>
           <div className="l">Chamados urgentes ⚠️</div>
         </div>
         <div className="stat">
@@ -36,12 +36,12 @@ export default function Dashboard() {
         </div>
         {user.role !== 'solicitante' && (
           <div className="stat">
-            <div className="n" style={{ color: '#d97706' }}>{mine.length}</div>
+            <div className="n" style={{ color: '#C08A3E' }}>{mine.length}</div>
             <div className="l">Atribuídos a mim</div>
           </div>
         )}
         <div className="stat">
-          <div className="n" style={{ color: '#16a34a' }}>{done.length}</div>
+          <div className="n" style={{ color: '#4F8A5B' }}>{done.length}</div>
           <div className="l">Concluídos</div>
         </div>
       </div>

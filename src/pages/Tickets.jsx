@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ticketsVisibleTo, categoriesForGroup, STATUS } from '../lib/domain';
 import { db } from '../lib/store';
-import { StatusBadge, UrgencyBadge, Avatar, Empty, timeAgo } from '../components/ui';
+import { StatusBadge, UrgencyBadge, Avatar, Empty, timeAgo, stripHtml } from '../components/ui';
 
 export default function Tickets() {
   const { user, activeGroup } = useAuth();
@@ -17,7 +17,7 @@ export default function Tickets() {
 
   if (q.trim()) {
     const s = q.toLowerCase();
-    tickets = tickets.filter((t) => t.title.toLowerCase().includes(s) || t.description.toLowerCase().includes(s));
+    tickets = tickets.filter((t) => t.title.toLowerCase().includes(s) || stripHtml(t.description).toLowerCase().includes(s));
   }
   if (status !== 'todos') tickets = tickets.filter((t) => t.status === status);
   if (cat !== 'todas') tickets = tickets.filter((t) => t.categoryId === cat);

@@ -18,6 +18,10 @@ export default function Team() {
   const isOwner = activeGroup.ownerId === user.id;
   const members = groupMembers(activeGroup);
   const categories = categoriesForGroup(activeGroup.id);
+  const tecnicos = members.filter((m) => m.role !== 'solicitante');
+  const solicitantes = members.filter((m) => m.role === 'solicitante');
+  const [tab, setTab] = useState('tecnicos');
+  const [q, setQ] = useState('');
 
   const copy = (code) => { navigator.clipboard?.writeText(code); };
 
@@ -55,43 +59,78 @@ export default function Team() {
       {isSuporte && <SuporteAdmin group={activeGroup} user={user} bump={bump} copy={copy}
         isOwner={isOwner} onDeleted={afterExit} onLeft={doLeave} />}
 
-      {/* ---- lista de membros (RP05: todos, exceto solicitante) ---- */}
-      <h2>Membros ({members.length})</h2>
-      <div className="card">
-        {members.map((m) => (
-          <div key={m.userId} className="ticket-row" style={{ cursor: 'default', alignItems: 'flex-start' }}>
-            <Avatar name={m.user.name} />
-            <div style={{ flex: 1 }}>
-              <div className="row" style={{ gap: 8 }}>
-                <b>{m.user.name}</b>
-                <RoleBadge role={m.role} />
-                {m.userId === activeGroup.ownerId && <span className="chip">dono</span>}
-              </div>
-              <div className="muted small">{m.user.email || m.user.login} · {m.user.cidade || 'sem cidade'}</div>
-
-              {m.role === 'dev' && (
-                <div className="mt">
-                  <div className="muted small mb">Categorias que atende:</div>
-                  <div className="row wrap" style={{ gap: 6 }}>
-                    {categories.length === 0 && <span className="muted small">Crie categorias primeiro.</span>}
-                    {categories.map((c) => {
-                      const on = (m.categoryIds || []).includes(c.id);
-                      return isSuporte ? (
-                        <button key={c.id} className={on ? 'btn-primary btn-sm' : 'btn-sm'}
-                          onClick={() => toggleCat(m.userId, c.id, m.categoryIds || [])}>
-                          {on ? '✓ ' : ''}{c.name}
-                        </button>
-                      ) : (
-                        on && <span key={c.id} className="chip">{c.name}</span>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
+      {/* ---- membros em abas: Técnicos x Solicitantes (RP05) ---- */}
+      <div className="auth-tabs" style={{ maxWidth: 420 }}>
+        <button className={tab === 'tecnicos' ? 'btn-primary' : ''} onClick={() => setTab('tecnicos')}>
+          Técnicos ({tecnicos.length})
+        </button>
+        <button className={tab === 'solicitantes' ? 'btn-primary' : ''} onClick={() => setTab('solicitantes')}>
+          Solicitantes ({solicitantes.length})
+        </button>
       </div>
+
+      {tab === 'tecnicos' ? (
+        <div className="card">
+          {tecnicos.map((m) => (
+            <div key={m.userId} className="ticket-row" style={{ cursor: 'default', alignItems: 'flex-start' }}>
+              <Avatar name={m.user.name} />
+              <div style={{ flex: 1 }}>
+                <div className="row" style={{ gap: 8 }}>
+                  <b>{m.user.name}</b>
+                  <RoleBadge role={m.role} />
+                  {m.userId === activeGroup.ownerId && <span className="chip">dono</span>}
+                </div>
+                <div className="muted small">{m.user.email || m.user.login}</div>
+
+                {m.role === 'dev' && (
+                  <div className="mt">
+                    <div className="muted small mb">Categorias que atende:</div>
+                    <div className="row wrap" style={{ gap: 6 }}>
+                      {categories.length === 0 && <span className="muted small">Crie categorias primeiro.</span>}
+                      {categories.map((c) => {
+                        const on = (m.categoryIds || []).includes(c.id);
+                        return isSuporte ? (
+                          <button key={c.id} className={on ? 'btn-primary btn-sm' : 'btn-sm'}
+                            onClick={() => toggleCat(m.userId, c.id, m.categoryIds || [])}>
+                            {on ? '✓ ' : ''}{c.name}
+                          </button>
+                        ) : (
+                          on && <span key={c.id} className="chip">{c.name}</span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div>
+          <div className="card card-pad mb">
+            <input placeholder="🔍 Buscar solicitante por nome ou cidade..." value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <div className="card">
+            {solicitantes.length === 0 && <div className="empty">Nenhum solicitante no grupo ainda.</div>}
+            {solicitantes
+              .filter((m) => {
+                const s = q.trim().toLowerCase();
+                if (!s) return true;
+                return m.user.name.toLowerCase().includes(s) || (m.user.cidade || '').toLowerCase().includes(s);
+              })
+              .map((m) => (
+                <div key={m.userId} className="ticket-row" style={{ cursor: 'default' }}>
+                  <Avatar name={m.user.name} size="sm" />
+                  <div style={{ flex: 1 }}>
+                    <b className="small">{m.user.name}</b>
+                    <div className="t-meta">{m.user.email || m.user.login}</div>
+                  </div>
+                  {m.user.cidade && <span className="chip">📍 {m.user.cidade}</span>}
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -134,7 +173,7 @@ function SuporteAdmin({ group, user, bump, copy, isOwner, onDeleted, onLeft }) {
   return (
     <>
       {/* códigos de convite */}
-      <div className="grid mb" style={{ gridTemplateColumns: '1fr 1fr' }}>
+      <div className="grid grid-2 mb">
         <div className="card card-pad">
           <h3>👨‍💻 Convite de técnicos</h3>
           <p className="muted small">Para suporte/devs entrarem no grupo.</p>

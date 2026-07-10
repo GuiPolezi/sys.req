@@ -6,11 +6,11 @@ import {
   assignTicket, setStatus, setUrgency, addAttendance,
   sendToReview, approveReview, rejectReview, toggleUrgentAlert,
   ticketMessages, postTicketMessage,
-  groupMembers, isTech, can, STATUS, URGENCY,
+  groupMembers, isTech, can, isTicketOwner, canChatOnTicket, STATUS, URGENCY,
 } from '../lib/domain';
 import { StatusBadge, UrgencyBadge, RoleBadge, Avatar, fmtDateTime } from '../components/ui';
+import { RichView } from '../components/RichText';
 
-// status ajustáveis manualmente (em_analise é definido via "Enviar para análise")
 const MANUAL_STATUS = ['aberto', 'em_andamento', 'aguardando', 'concluido'];
 
 export default function TicketDetail() {
@@ -28,10 +28,14 @@ export default function TicketDetail() {
   const isSuporte = user.role === 'suporte';
   const tech = isTech(user.role);
   const isAuthor = ticket.createdBy === user.id;
+  const owner = isTicketOwner(ticket, user);        // responsável pelo ticket
+  const canChat = canChatOnTicket(ticket, user);
   const author = db.byId('users', ticket.createdBy);
   const assignee = ticket.assignedTo ? db.byId('users', ticket.assignedTo) : null;
   const cat = ticket.categoryId ? db.byId('categories', ticket.categoryId) : null;
+  const sys = ticket.systemId ? db.byId('systems', ticket.systemId) : null;
   const assignables = groupMembers(activeGroup).filter((m) => m.role !== 'solicitante');
+  const requesterLabel = ticket.requesterName || author?.name;
 
   return (
     <div>
@@ -41,17 +45,17 @@ export default function TicketDetail() {
       </div>
 
       {ticket.urgentAlert && (
-        <div className="alert" style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c' }}>
+        <div className="alert" style={{ background: 'var(--danger-soft)', border: '1px solid #E8CFC8', color: '#8F3121' }}>
           🚨 <b>Alerta de urgência</b> enviado pelo solicitante — este chamado precisa de atenção imediata.
         </div>
       )}
       {ticket.status === 'em_analise' && (
         <div className="alert alert-info">
-          🔎 Em análise — aguardando o solicitante <b>{author?.name}</b> confirmar se foi resolvido.
+          🔎 Em análise — aguardando o solicitante <b>{requesterLabel}</b> confirmar se foi resolvido.
         </div>
       )}
 
-      <div className="grid" style={{ gridTemplateColumns: '1fr 320px', alignItems: 'start' }}>
+      <div className="grid grid-sidebar" style={{ alignItems: 'start' }}>
         {/* ---------- coluna principal ---------- */}
         <div className="col" style={{ gap: 16 }}>
           <div className="card card-pad">
@@ -63,19 +67,20 @@ export default function TicketDetail() {
               </div>
             </div>
             <p className="muted small" style={{ marginTop: 6 }}>
-              Aberto por <b>{author?.name}</b> · {fmtDateTime(ticket.createdAt)} · {ticket.type}
+              Solicitante <b>{requesterLabel}</b>
+              {author && author.id !== ticket.requesterId && <> · registrado por {author.name}</>}
+              {' · '}{fmtDateTime(ticket.createdAt)} · {ticket.type}
+              {sys && <> · <span className="chip">🖥️ {sys.name}</span></>}
               {cat && <> · <span className="chip">{cat.name}</span></>}
               {ticket.cidade && <> · 📍 {ticket.cidade}</>}
             </p>
             <div className="divider" />
-            <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
-              {ticket.description || <span className="muted">Sem descrição.</span>}
-            </p>
+            <RichView html={ticket.description} />
           </div>
 
-          <TicketChat ticket={ticket} user={user} onPost={bump} key={tick} />
+          <TicketChat ticket={ticket} user={user} onPost={bump} canChat={canChat} key={tick} />
 
-          {tech && <Attendances ticket={ticket} user={user} onAdd={bump} />}
+          {tech && <Attendances ticket={ticket} user={user} onAdd={bump} canRegister={owner} />}
         </div>
 
         {/* ---------- coluna lateral (ações) ---------- */}
@@ -114,7 +119,7 @@ export default function TicketDetail() {
               <div className="row" style={{ gap: 8 }}>
                 <Avatar name={assignee.name} size="sm" />
                 <div className="col">
-                  <b style={{ fontSize: 13 }}>{assignee.name}</b>
+                  <b style={{ fontSize: 13 }}>{assignee.name}{owner && ' (você)'}</b>
                   <RoleBadge role={assignee.role} />
                 </div>
               </div>
@@ -141,7 +146,8 @@ export default function TicketDetail() {
             )}
           </div>
 
-          {tech && (
+          {/* Status/urgência: só o responsável pelo ticket */}
+          {tech && owner && (
             <div className="card card-pad">
               <h3>Status</h3>
               <div className="col" style={{ gap: 6 }}>
@@ -157,7 +163,6 @@ export default function TicketDetail() {
                 ))}
               </div>
 
-              {/* RCS08 — enviar para análise do solicitante */}
               {can.sendToReview(user.role) && ['em_andamento', 'aguardando'].includes(ticket.status) && (
                 <button className="btn-sm mt" style={{ width: '100%', justifyContent: 'center' }}
                   onClick={() => { sendToReview(ticket.id, user); bump(); }}>
@@ -178,6 +183,13 @@ export default function TicketDetail() {
               </div>
             </div>
           )}
+          {tech && !owner && (
+            <div className="card card-pad">
+              <p className="muted small" style={{ margin: 0 }}>
+                🔒 Alterar status, urgência e registrar atendimentos é liberado apenas para o <b>responsável</b> pelo chamado.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -185,9 +197,9 @@ export default function TicketDetail() {
 }
 
 // -------------------------------------------------------------
-//  Chat do chamado (RCS03)
+//  Chat do chamado (RCS03) — escrita só p/ responsável e solicitante
 // -------------------------------------------------------------
-function TicketChat({ ticket, user, onPost }) {
+function TicketChat({ ticket, user, onPost, canChat }) {
   const [text, setText] = useState('');
   const logRef = useRef(null);
   const messages = ticketMessages(ticket.id);
@@ -223,18 +235,24 @@ function TicketChat({ ticket, user, onPost }) {
           );
         })}
       </div>
-      <form className="chat-input" onSubmit={send}>
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Escreva uma mensagem..." />
-        <button className="btn-primary">Enviar</button>
-      </form>
+      {canChat ? (
+        <form className="chat-input" onSubmit={send}>
+          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Escreva uma mensagem..." />
+          <button className="btn-primary">Enviar</button>
+        </form>
+      ) : (
+        <div className="chat-input" style={{ justifyContent: 'center' }}>
+          <span className="muted small">🔒 Apenas o responsável pelo chamado e o solicitante podem enviar mensagens.</span>
+        </div>
+      )}
     </div>
   );
 }
 
 // -------------------------------------------------------------
-//  Atendimentos (registro de trabalho feito) — só técnicos
+//  Atendimentos (registro de trabalho feito) — só o responsável registra
 // -------------------------------------------------------------
-function Attendances({ ticket, user, onAdd }) {
+function Attendances({ ticket, user, onAdd, canRegister }) {
   const [note, setNote] = useState('');
   const add = (e) => {
     e.preventDefault();
@@ -258,10 +276,14 @@ function Attendances({ ticket, user, onAdd }) {
           );
         })}
       </div>
-      <form className="row mt" onSubmit={add} style={{ gap: 8 }}>
-        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Registrar o que foi feito..." />
-        <button className="btn-primary btn-sm">Registrar</button>
-      </form>
+      {canRegister ? (
+        <form className="row mt" onSubmit={add} style={{ gap: 8 }}>
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Registrar o que foi feito..." />
+          <button className="btn-primary btn-sm">Registrar</button>
+        </form>
+      ) : (
+        <p className="muted small mt" style={{ margin: '10px 0 0' }}>🔒 Só o responsável pelo chamado pode registrar atendimentos.</p>
+      )}
     </div>
   );
 }

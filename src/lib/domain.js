@@ -5,24 +5,25 @@
 // =============================================================
 import { db, uid, nowISO, shortCode } from './store';
 
+// Paleta quente e harmônica com o tema "paper/clay" (design v02)
 export const ROLES = {
-  suporte: { label: 'Suporte', color: '#2563eb' },
-  dev: { label: 'Desenvolvedor', color: '#7c3aed' },
-  solicitante: { label: 'Solicitante', color: '#0f766e' },
+  suporte: { label: 'Suporte', color: '#C15F3C' },
+  dev: { label: 'Desenvolvedor', color: '#6A62A8' },
+  solicitante: { label: 'Solicitante', color: '#3F8F7B' },
 };
 
 export const STATUS = {
-  aberto: { label: 'Aberto', color: '#dc2626' },
-  em_andamento: { label: 'Em andamento', color: '#d97706' },
-  aguardando: { label: 'Aguardando', color: '#0891b2' },
-  em_analise: { label: 'Em análise', color: '#7c3aed' }, // RCS08
-  concluido: { label: 'Concluído', color: '#16a34a' },
+  aberto: { label: 'Aberto', color: '#C2542F' },
+  em_andamento: { label: 'Em andamento', color: '#C08A3E' },
+  aguardando: { label: 'Aguardando', color: '#4A8D9E' },
+  em_analise: { label: 'Em análise', color: '#6A62A8' }, // RCS08
+  concluido: { label: 'Concluído', color: '#4F8A5B' },
 };
 
 export const URGENCY = {
-  baixa: { label: 'Baixa', color: '#16a34a', weight: 1 },
-  media: { label: 'Média', color: '#d97706', weight: 2 },
-  alta: { label: 'Alta', color: '#dc2626', weight: 3 },
+  baixa: { label: 'Baixa', color: '#4F8A5B', weight: 1 },
+  media: { label: 'Média', color: '#C08A3E', weight: 2 },
+  alta: { label: 'Alta', color: '#C2542F', weight: 3 },
 };
 
 export const TICKET_TYPES = ['Solicitação', 'Erro', 'Dúvida', 'Melhoria', 'Ajuste'];
@@ -40,10 +41,21 @@ export const can = {
   sendToReview: (role) => isTech(role),                 // RCS08
   leaveGroup: (role) => role !== 'solicitante',         // RP12
   viewMembers: (role) => role !== 'solicitante',        // RP05
-  registerAttendance: (role) => isTech(role),           // RCS12
+  registerAttendance: (role) => role === 'suporte',     // RCS12 — exclusivo do suporte
   viewReports: (role) => role === 'suporte',            // RCS09 / RP16
   chooseOwnCategory: (role) => role === 'dev',          // RP15
+  createTicketForOthers: (role) => isTech(role),        // técnico abre em nome de um solicitante
 };
+
+// Ações restritas ao RESPONSÁVEL pelo ticket (status, urgência, atendimentos).
+export function isTicketOwner(ticket, user) {
+  return !!ticket.assignedTo && ticket.assignedTo === user.id;
+}
+// Quem pode escrever no chat do chamado: o solicitante (autor) sempre; o técnico só se for o responsável.
+export function canChatOnTicket(ticket, user) {
+  if (user.role === 'solicitante') return ticket.createdBy === user.id || ticket.requesterId === user.id;
+  return isTicketOwner(ticket, user);
+}
 
 // ------------------------------------------------------------
 //  AUDITORIA (RP16)
@@ -273,7 +285,7 @@ export function respondInvitation(inviteId, accept) {
 // ------------------------------------------------------------
 //  CATEGORIAS DE DESENVOLVEDOR (RP14/RP15)
 // ------------------------------------------------------------
-const CAT_COLORS = ['#2563eb', '#7c3aed', '#0891b2', '#db2777', '#ea580c', '#16a34a', '#4f46e5'];
+const CAT_COLORS = ['#C15F3C', '#6A62A8', '#4A8D9E', '#B5567E', '#C08A3E', '#4F8A5B', '#8A6D4B'];
 
 export function categoriesForGroup(groupId) {
   return db.filter('categories', (c) => c.groupId === groupId);
@@ -300,6 +312,34 @@ export function deleteCategory(id, actor) {
   db.filter('tickets', (t) => t.categoryId === id).forEach((t) => db.update('tickets', t.id, { categoryId: null }));
   db.remove('categories', id);
   if (cat) logAudit(cat.groupId, actor?.id, 'categoria.removida', `Categoria "${cat.name}" removida.`);
+}
+
+// ------------------------------------------------------------
+//  SISTEMAS DO GRUPO — identificam o sistema afetado no chamado
+// ------------------------------------------------------------
+export function systemsForGroup(groupId) {
+  return db.filter('systems', (s) => s.groupId === groupId).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function createSystem(groupId, { name, categoryId }, actor) {
+  if (!name.trim()) throw new Error('Informe o nome do sistema.');
+  const sys = {
+    id: uid('sys'),
+    groupId,
+    name: name.trim(),
+    categoryId: categoryId || null,
+    createdAt: nowISO(),
+  };
+  db.insert('systems', sys);
+  logAudit(groupId, actor?.id, 'sistema.criado', `Sistema "${sys.name}" adicionado.`);
+  return sys;
+}
+
+export function deleteSystem(id, actor) {
+  const sys = db.byId('systems', id);
+  db.filter('tickets', (t) => t.systemId === id).forEach((t) => db.update('tickets', t.id, { systemId: null }));
+  db.remove('systems', id);
+  if (sys) logAudit(sys.groupId, actor?.id, 'sistema.removido', `Sistema "${sys.name}" removido.`);
 }
 
 // ------------------------------------------------------------
@@ -338,20 +378,42 @@ export function deleteService(id, actor) {
 // ------------------------------------------------------------
 export function createTicket(groupId, data, author, serviceId = null) {
   const service = serviceId ? db.byId('services', serviceId) : null;
+
+  // Quem é o solicitante do chamado?
+  //  - solicitante abrindo: ele mesmo
+  //  - técnico abrindo em nome de alguém: solicitante registrado (requesterId) ou nome avulso
+  let requesterId = null;
+  let requesterName = '';
+  let cidade = '';
+  if (author.role === 'solicitante') {
+    requesterId = author.id;
+    requesterName = author.name;
+    cidade = author.cidade || '';
+  } else {
+    requesterId = data.requesterId || null;
+    const reg = requesterId ? db.byId('users', requesterId) : null;
+    requesterName = (reg?.name || data.requesterName || '').trim();
+    cidade = (reg?.cidade || data.cidade || '').trim();
+  }
+
+  const assignedTo = data.assignTo || service?.assignTo || null; // técnico responsável
   const ticket = {
     id: uid('tkt'),
     groupId,
     title: data.title.trim(),
-    description: (data.description || '').trim(),
+    description: data.description || '', // pode conter HTML (editor rico)
     type: data.type || service?.ticketType || 'Solicitação',
     categoryId: data.categoryId || service?.categoryId || null,
+    systemId: data.systemId || null,
     status: 'aberto',
     urgency: data.urgency || service?.urgency || 'media',
     urgentAlert: false,
     createdBy: author.id,
-    assignedTo: service?.assignTo || null, // serviço já padroniza a atribuição (RCS07)
+    requesterId,
+    requesterName,
+    assignedTo,
     serviceId: serviceId || null,
-    cidade: (data.cidade || author.cidade || '').trim(),
+    cidade: cidade.trim(),
     attendances: [],
     createdAt: nowISO(),
     updatedAt: nowISO(),
@@ -442,10 +504,25 @@ export function ticketsVisibleTo(group, user) {
         !t.assignedTo // sem atribuição aparece para o dev
     );
   }
-  // solicitante (RP19): os seus + os da sua cidade
+  // solicitante (RP19): os seus (criados por si ou em seu nome) + os da sua cidade
   return all.filter(
-    (t) => t.createdBy === user.id || (user.cidade && t.cidade && t.cidade.toLowerCase() === user.cidade.toLowerCase())
+    (t) =>
+      t.createdBy === user.id ||
+      t.requesterId === user.id ||
+      (user.cidade && t.cidade && t.cidade.toLowerCase() === user.cidade.toLowerCase())
   );
+}
+
+// Tickets atribuídos a um técnico (página "Atribuídos a mim")
+export function ticketsAssignedTo(groupId, userId) {
+  return db
+    .filter('tickets', (t) => t.groupId === groupId && t.assignedTo === userId)
+    .sort((a, b) => {
+      const done = { concluido: 1 };
+      const ad = done[a.status] || 0, bd = done[b.status] || 0;
+      if (ad !== bd) return ad - bd;
+      return b.updatedAt.localeCompare(a.updatedAt);
+    });
 }
 
 // RCS06 — pool de não-atribuídos (dashboard de devs)
@@ -506,18 +583,29 @@ export function supportStats(groupId, userId) {
   return { total: list.length, today: byDay[today] || 0, days };
 }
 
-// RCS09 — ranking de quem mais abre solicitações (filtro por cidade)
+// RCS09 — ranking de quem mais abre solicitações (só SOLICITANTES; filtro por cidade)
 export function requesterRanking(groupId, cidadeFilter = '') {
   const tickets = db.filter('tickets', (t) => t.groupId === groupId);
   const byUser = {};
   tickets.forEach((t) => {
     if (cidadeFilter && (t.cidade || '').toLowerCase() !== cidadeFilter.toLowerCase()) return;
-    byUser[t.createdBy] = (byUser[t.createdBy] || 0) + 1;
+    const uid_ = t.requesterId || t.createdBy; // conta para o solicitante em nome de quem foi aberto
+    if (!uid_) return;
+    byUser[uid_] = (byUser[uid_] || 0) + 1;
   });
   return Object.entries(byUser)
     .map(([userId, count]) => ({ user: db.byId('users', userId), count }))
-    .filter((r) => r.user)
+    .filter((r) => r.user && r.user.role === 'solicitante') // técnicos são desconsiderados
     .sort((a, b) => b.count - a.count);
+}
+
+// Estatísticas do solicitante (perfil): total criado e concluídos
+export function requesterStats(groupId, userId) {
+  const mine = db.filter('tickets', (t) => t.groupId === groupId && (t.requesterId === userId || t.createdBy === userId));
+  const total = mine.length;
+  const concluido = mine.filter((t) => t.status === 'concluido').length;
+  const emAndamento = mine.filter((t) => t.status !== 'concluido').length;
+  return { total, concluido, emAndamento };
 }
 
 export function citiesInGroup(groupId) {
@@ -544,16 +632,18 @@ export function postTicketMessage(ticketId, userId, text) {
   });
 }
 
-export function internalMessages(groupId) {
+// channel: 'geral' ou o id de uma categoria de dev
+export function internalMessages(groupId, channel = 'geral') {
   return db
-    .filter('internalMessages', (m) => m.groupId === groupId)
+    .filter('internalMessages', (m) => m.groupId === groupId && (m.channel || 'geral') === channel)
     .sort((a, b) => a.at.localeCompare(b.at));
 }
-export function postInternalMessage(groupId, userId, text) {
+export function postInternalMessage(groupId, userId, text, channel = 'geral') {
   return db.insert('internalMessages', {
     id: uid('imsg'),
     groupId,
     userId,
+    channel,
     text: text.trim(),
     at: nowISO(),
   });

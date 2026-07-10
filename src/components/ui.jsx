@@ -62,6 +62,10 @@ export function timeAgo(iso) {
   return d.toLocaleDateString('pt-BR');
 }
 
+export function stripHtml(html) {
+  return (html || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 export function fmtDateTime(iso) {
   return new Date(iso).toLocaleString('pt-BR', {
     day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',

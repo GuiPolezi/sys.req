@@ -19,10 +19,10 @@ export default function Auth() {
           </div>
           {tab === 'login' ? <LoginForm /> : <RegisterForm />}
         </div>
-        <p className="muted small" style={{ textAlign: 'center', marginTop: 14, color: '#94a3b8' }}>
+        <p className="muted small" style={{ textAlign: 'center', marginTop: 14, color: 'var(--muted)' }}>
           Contas demo: <b>ana</b> (suporte), <b>bruno</b> (dev), <b>davi</b> (solicitante) — senha <b>123</b>
           <br />
-          <button className="btn-sm btn-ghost" style={{ color: '#cbd5e1', marginTop: 6 }} onClick={() => { forceReseed(); location.reload(); }}>
+          <button className="btn-sm btn-ghost" style={{ color: 'var(--primary)', marginTop: 6 }} onClick={() => { forceReseed(); location.reload(); }}>
             ↺ Recarregar dados demo
           </button>
         </p>
@@ -121,10 +121,12 @@ function RegisterForm() {
           <label>Login</label>
           <input value={form.login} onChange={set('login')} required />
         </div>
-        <div className="field" style={{ flex: 1 }}>
-          <label>Cidade{isRequester ? ' *' : ''}</label>
-          <input value={form.cidade} onChange={set('cidade')} required={isRequester} placeholder={isRequester ? 'Obrigatória' : ''} />
-        </div>
+        {isRequester && (
+          <div className="field" style={{ flex: 1 }}>
+            <label>Cidade *</label>
+            <input value={form.cidade} onChange={set('cidade')} required placeholder="Obrigatória" />
+          </div>
+        )}
       </div>
       <div className="field">
         <label>E-mail</label>

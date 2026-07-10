@@ -9,8 +9,11 @@ import Tickets from './pages/Tickets';
 import NewTicket from './pages/NewTicket';
 import TicketDetail from './pages/TicketDetail';
 import Pool from './pages/Pool';
+import Assigned from './pages/Assigned';
 import Categories from './pages/Categories';
+import Systems from './pages/Systems';
 import Services from './pages/Services';
+import Groups from './pages/Groups';
 import Team from './pages/Team';
 import Invites from './pages/Invites';
 import InternalChat from './pages/InternalChat';
@@ -54,13 +57,16 @@ export default function App() {
         <Route path="/tickets/new" element={<NewTicket />} />
         <Route path="/tickets/:id" element={<TicketDetail />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/groups" element={<Groups />} />
         {tech && <Route path="/pool" element={<Pool />} />}
+        {tech && <Route path="/assigned" element={<Assigned />} />}
         {tech && <Route path="/chat" element={<InternalChat />} />}
         {tech && <Route path="/invites" element={<Invites />} />}
         {can.viewMembers(role) && <Route path="/team" element={<Team />} />}
         {can.createService(role) && <Route path="/services" element={<Services />} />}
         {can.registerAttendance(role) && <Route path="/attendances" element={<Attendances />} />}
         {can.manageGroup(role) && <Route path="/categories" element={<Categories />} />}
+        {can.manageGroup(role) && <Route path="/systems" element={<Systems />} />}
         {can.viewReports(role) && <Route path="/ranking" element={<Ranking />} />}
         {can.viewReports(role) && <Route path="/audit" element={<Audit />} />}
         <Route path="*" element={<Navigate to="/" replace />} />

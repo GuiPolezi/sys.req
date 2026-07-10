@@ -24,7 +24,7 @@ function NoGroupShell({ children }) {
         <div className="spacer" />
         <div className="row" style={{ gap: 8, padding: 10 }}>
           <Avatar name={user.name} size="sm" />
-          <span className="small" style={{ color: '#cbd5e1' }}>{user.name}</span>
+          <span className="small" style={{ color: 'var(--text-soft)' }}>{user.name}</span>
         </div>
         <button className="btn-sm" onClick={() => { logout(); navigate('/login'); }}>Sair</button>
       </aside>

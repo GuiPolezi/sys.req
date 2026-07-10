@@ -13,6 +13,7 @@ const COLLECTIONS = [
   'users',
   'groups',
   'categories',
+  'systems',       // sistemas do grupo (selecionáveis no chamado)
   'tickets',
   'ticketMessages',
   'internalMessages',

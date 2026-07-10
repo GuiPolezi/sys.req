@@ -6,6 +6,7 @@ import {
   createUser,
   createGroup,
   createCategory,
+  createSystem,
   createTicket,
   joinGroupByCode,
   updateMemberCategories,
@@ -58,6 +59,12 @@ export function seedIfNeeded() {
   const desktop = createCategory(group.id, { name: 'Desenvolvimento Desktop', systems: ['Siscam 9', 'Siave'] }, ana);
   createCategory(group.id, { name: 'Infraestrutura', systems: ['Rede', 'Servidores'] }, ana);
 
+  // --- sistemas do grupo (selecionáveis no chamado) ------------
+  const sSiscam9 = createSystem(group.id, { name: 'Siscam 9', categoryId: desktop.id }, ana);
+  createSystem(group.id, { name: 'Siave', categoryId: desktop.id }, ana);
+  const sSite = createSystem(group.id, { name: 'Site institucional', categoryId: web.id }, ana);
+  createSystem(group.id, { name: 'Siscam Web', categoryId: web.id }, ana);
+
   // --- entrada dos demais membros ------------------------------
   joinGroupByCode(bruno, group.techInviteCode);
   joinGroupByCode(carla, group.techInviteCode);
@@ -94,7 +101,7 @@ export function seedIfNeeded() {
   const t1 = createTicket(group.id, {
     title: 'Siscam 9 não abre após atualização',
     description: 'Ao abrir o Siscam 9 aparece erro de conexão com o banco.',
-    type: 'Erro', categoryId: desktop.id, urgency: 'alta',
+    type: 'Erro', categoryId: desktop.id, systemId: sSiscam9.id, urgency: 'alta',
   }, davi);
 
   createTicket(group.id, {
@@ -107,7 +114,7 @@ export function seedIfNeeded() {
   createTicket(group.id, {
     title: 'Melhoria: filtro por data no site',
     description: 'Seria útil filtrar registros por período no site.',
-    type: 'Melhoria', categoryId: web.id, urgency: 'media',
+    type: 'Melhoria', categoryId: web.id, systemId: sSite.id, urgency: 'media',
   }, davi);
 
   // ticket em análise (RCS08)
@@ -128,6 +135,8 @@ export function seedIfNeeded() {
   postTicketMessage(t1.id, bruno.id, 'Bom dia, Davi. Vou verificar a conexão com o servidor.');
   postInternalMessage(group.id, ana.id, 'Pessoal, priorizem os chamados do site hoje.');
   postInternalMessage(group.id, bruno.id, 'Ok, já peguei o do Siscam 9.');
+  // mensagem no canal da categoria Web
+  postInternalMessage(group.id, carla.id, 'Time Web: fechei o ajuste do rodapé, podem revisar.', web.id);
 
   markSeeded();
   return { ana, bruno, carla, davi, group };
