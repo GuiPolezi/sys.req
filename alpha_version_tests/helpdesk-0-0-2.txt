@@ -1,0 +1,62 @@
+Testando versão 0.0.2
+
+
+## Testes como usuário Suporte
+
+Problemas encontrados
+- O sistema é configurado a partir de grupos, então o usuário dentro de um grupo vê solicitações e todos os outros conteúdos.
+Ao logar como ana Suporte, estou dentro de um grupo, mas não vejo opção de criar novo grupo ou de acessar um outro grupo - Para visualizar conteúdos diferentes. Esta faltando uma página desse tipo ou um menu para acessos nos grupos.
+
+- O usuário Técnico (desenvolvedor e suporte) não precisa ter a cidade no cadastro. Apenas o solicitante deve informar sua cidade.
+
+- O gráfico de ranking de solicitantes deve ser melhorado. Deixe uma visualização melhor, mais elegante e com gráficos se possível
+
+
+
+Testes:
+- Criação de serviços, esta ok.
+- Criação de Categorias, esta ok.
+
+
+Melhorias/ Ajustes
+- Página atendimentos, o Registro esta OK e funcionando como gostaria. Mas a página deve ser reformulada. Durante um dia iremos cadastrar muitos atendimentos. Deve ter possibilidade de navegar entre dias, ter um mini calendário em algum local da página, também pensei na possibilidade de clicar em um botão para abrir o formulário de registro do atendimento. E a visualização dos atendimentos deve ser intuitiva e fácil.
+
+
+- Página Membros; Estou me habituando com ela e ate agora esta boa, mas quero uma melhoria. Quero separar a visualização dos membros que são solicitantes, algo como uma outra guia. Deve ser possível visualizar os membros Técnicos e os solicitantes de forma distinta. Pois, no meu uso, teremos centenas de solicitantes.
+
+- Chat Interno; Ficou ótimo esse chat, mas pensei em uma nova melhoria também. Além do chat interno geral, adicione abas ou algo do tipo para que seja possível ter um chat interno entre as categorias de desenvolvedores. Então quero que seja possível acessar chat do desenvolvimento web, por exemplo, e assim por diante.
+
+
+
+Testes de Chamados
+Painel - Por enquanto está ok essas informações
+
+- Abrindo Chamado: 
+Ajuste: Quero que tenha a seguinte ação: Ao clicar em abrir chamado, fazer aparecer uma opção para o usuário: Selecionar algum serviço ou criar chamado avulso, e a partir disso mostrar o formulário de criação do chamado (ticket).
+
+O Campo descrição do chamado deve ser melhorado; Deve ser um campo onde podemos adicionar imagens, estilizar a letra, colocar grid, etc. Um bom campo de texto e inserção de imagens.
+
+No chamado, quero conseguir selecionar o sistema que esta com problema. Então deve-se ter a seguinte adição no sistema: Faça isso de forma coerente e desenvolva da melhor maneira possível. Deve ser possível, no grupo, adicionar os sistemas do grupo, para que posteriormente sejam selecionados no chamado, ESSA É UMA FUNÇÃO QUE BUSCA MELHORAR A IDENTIFICAÇÃO DO SISTEMA NO CHAMADO E o chamado como um todo.
+
+Esta faltando o campo de seleção do técnico que sera responsável pelo chamado. No usuário suporte senti falta de uma página especifica para os chamados que estão atribuídos a mim.
+
+Dentro do chamado: O chat so deve estar disponível (para escrever e enviar mensagem) para o técnico que esta atribuído a ele e o solicitante(obviamente). Se não houver ninguém com o chamado, então ninguém pode mandar mensagem> Exceto o solicitante.
+
+O status, urgencia e Atendimentos registrados também devem ser bloqueados para os tecnicos, e liberado apenas para o responsavel pelo ticket.
+
+
+A criação de tickets deve ser um pouco reformulada, juntamente com o ranking de solicitantes. Quero que no ranking busque apenas os usuarios "Solicitantes" - Técnicos (desenvolvedor e Suporte) devem ser desconsiderados.
+
+O solicitante pode criar ticket, mas o tecnico suporte também, então quando for um técnico criando (aquele usuario que nao é solicitante) deve aparecer o campo para escolher qual o usuario solicitante que esta criando esse chamado. Exemplo: Sou suporte da empresa, falo com um cliente, ele nao cria usuario no sistema, então tenho que criar o ticket para ele, como estou criando para ele devo atribuir ao seu nome, para reconhecimento e armazenamento de informações e organização no sistema. Então deve ser possivel selecionar o usuario solicitante ou escrever o nome do solicitante - Caso não exista cadastro deste usuario no sistema.
+
+## Testes como solicitante
+Para o solicitante:
+- No registro do chamado, o campo cidade deve ser um campo que não pode ser editado.  
+
+No perfil do solicitante deve mostrar a quantidade de solicitações que ele ja fez no sistema, quantidade de solicitações sua que ja foram concluídas. O solicitante não pode editar a cidade do perfil dele. 
+
+
+## Testes como desenvolvedor
+- O usuario desenvolvedor não pode acessar a página de Registro de atendimentos, essa é uma página exclusiva ao suporte.
+
+Analise todas essas informações e Desenvolva.
