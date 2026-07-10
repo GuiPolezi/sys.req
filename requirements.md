@@ -1,33 +1,3 @@
-# Requisitos Sistema
-Escrevendo em formato de rascunho para elaborar corretamente depois
-
-1. O sistema deve ter cadastro de usuarios
-2. O cadastro deve ter 3 tipos: Solicitante, Desenvolvedor, Suporte
-3. O sistema deve ter Grupos
-4. O grupo so pode ser criado pelo técnico suporte.
-5. O cadastro de solicitante só pode ser realizado se o suporte disponibilizar um codigo do grupo. 
-6. O técnico (dev ou suporte) acessa o sistema e não vê informações; Para ver deve estar em um grupo.
-7. O suporte pode convidar para o grupo
-8. O cadastro do grupo é apenas o seu nome
-9. O sistema deve permitir o tecnico alternar entre seus grupos - Mudando assim todas as informações de tickets, etc.
-10. O sistema deve permitir a criação de tickets
-11. Deve haver um algoritmo para atribuição automatica de tickets aos devs
-12. Deve ser possivel atribuir o ticket manualmente.
-13. O solicitante cria tickets que são atribuidos automaticamente
-14. O solicitante vê todos os seus tickets em um dashboard
-15. O solicitante consegue solicitar urgencia no ticket, para alertar o desenvolvedor
-16. O desenvolvedor vê painel dashboard com diversas informações de tickets
-17. O desenvolvedor pode criar ticket
-18. O desenvolver pode escolher atribuir a si um ticket que não esta atribuido a ninguem
-19. Deve ser possivel deixar o ticket sem atribuição
-20. Tickets sem atribuição devem aparecer para todos os devs, em uma página especifica para isso (tipo dashboard)
-21. O desenvolver pode escolher visualizar apenas seus proprios tickets
-22. O sistema deve permitir configurar as categorias que o desenvolvedor atende
-23. O sistema deve ter categorias de desenvolvedor
-24. O desenvolvedor pode marcar tickets concluidos
-25. 
-
-
 # Categorizando Requisitos
 
 ## Requisitos de Cadastro
@@ -56,7 +26,10 @@ RP13 - Apenas suporte pode apagar um grupo, depois de passar por varias mensagen
 RP14 - No grupo, o suporte deve conseguir criar Categorias do usuario Desenvolvedor. Para que seja possivel definir se aquele usuario faz parte de Desenvolvimento web, desktop, etc...
 RP15 - O desenvolvedor deve conseguir escolher qual categoria ele pertence. O suporte deve conseguir atribuir tambem aos desenvolvedores
 RP16 - O sistema deve fornecer um log de auditoria de cada movimentação realizada no grupo.
-
+RP17 - Usuario suporte deve conseguir visualizar todos os tickets dos grupos que pertence, deve conseguir criar filtros para buscar tickets, deve tambem conseguir visualizar seus proprios tickets
+RP18 - O usuario desenvolvedor deve conseguir visualizar seus tickets atribuidos, tickets de sua categoria, tickets sem atribuição
+RP19 - O usuario solicitante deve conseguir visualizar seus proprios tickets criados e todos os tickets da cidade onde ele pertence.
+RP20 - Suporte e Desenvolvedor podem marcar tickets como concluido.
 
 ## Requisitos de Conteudo do sistema
 RCS01 - O sistema deve permitir a criação de tickets
@@ -64,4 +37,11 @@ RCS02 - O sistema deve permitir a interação por mensagem entre os tecnicos do 
 RCS03 - O sistema deve possuir um chat interno em cada ticket.
 RCS04 - O sistema deve permitir a criação de serviços para automatizar criação de tickets
 RCS05 - O sistema deve permitir que o solicitante envie um alerta de pedido de urgencia no ticket.
-RCS06 - 
+RCS06 - O sistema deve permitir criação de tickets sem atribuição, Tickets sem atribuição devem aparecer para todos os devs, em uma página especifica para isso (tipo dashboard);
+RCS07 - O sistema deve fazer com que serviços sejam uma forma de padronizar criação de tickets, Exemplo: Criar um serviço para ticket de website - Padroniza a categoria do dev, padroniza as atribuições, também deve ser possivel padronizar o titulo, e criar mais de um serviço para um mesmo tipo de ticket website - Onde tem ticket para erro, ticket para melhoria, ticket para ajustes em configurações.
+RCS08 - O sistema deve permitir marcar ticket para "Analise" Assim o solicitante recebe-o de volta e verifica se foi feito, caso não, marca como rejeitado e volta para o desenvolvedor.
+RCS09 - O sistema deve ter uma visualização dos usuarios que mais criam solicitações, com filtros por cidade, etc...
+RCS10 - O sistema deve ter uma especie de gamificação para os devs, onde em seus perfis do grupo, mostra a quantidade de tickets finalizados, quantidade de tickets atribuidos, quanto mais finaliza mais xp ganha.
+RCS11 - O sistema deve mostrar no perfil do suporte do respectivo grupo, a quantidade de chamados atendidos por dia e no total.
+RCS12 - O sistema deve ter uma página ou algo do tipo para permitir o cadastro de chamados feito pelo suporte. Isso é especifico para o suporte, por exemplo: Suporte atendeu cliente cm itajuba, ele deve ser capaz de registrar isso. Cada chamado é registrado.
+
