@@ -358,6 +358,18 @@ code {
   padding: 1px 5px;
 }
 
+/* ---------- Gráfico de colunas ---------- */
+.colchart { display: flex; align-items: flex-end; gap: 6px; }
+.colchart-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; min-width: 0; }
+.colchart-track { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.colchart-bar {
+  width: 66%; max-width: 34px; min-height: 3px; border-radius: 6px 6px 0 0;
+  position: relative; transition: height 0.3s ease; opacity: 0.92;
+}
+.colchart-col:hover .colchart-bar { opacity: 1; }
+.colchart-val { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 700; color: var(--text-soft); }
+.colchart-label { font-size: 10px; color: var(--muted); margin-top: 5px; }
+
 /* ---------- Chat com canais ---------- */
 .chat-layout { display: grid; grid-template-columns: 220px 1fr; gap: 16px; align-items: start; }
 .channels { padding: 10px; }

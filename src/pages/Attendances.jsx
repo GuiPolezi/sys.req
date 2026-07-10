@@ -16,7 +16,7 @@ export default function Attendances() {
   const [selected, setSelected] = useState(ymd(today));
   const [view, setView] = useState({ y: today.getFullYear(), m: today.getMonth() });
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ cidade: user.cidade || '', client: '', note: '' });
+  const [form, setForm] = useState({ cidade: '', client: '', note: '' });
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const bump = () => { refresh(); setLocal((n) => n + 1); };
 
@@ -33,7 +33,7 @@ export default function Attendances() {
     e.preventDefault();
     if (!form.note.trim() && !form.client.trim()) return;
     registerAttendance(activeGroup.id, form, user);
-    setForm({ cidade: user.cidade || '', client: '', note: '' });
+    setForm({ cidade: '', client: '', note: '' });
     setOpen(false);
     bump();
   };
