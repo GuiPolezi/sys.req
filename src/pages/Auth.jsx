@@ -122,8 +122,8 @@ function RegisterForm() {
           <input value={form.login} onChange={set('login')} required />
         </div>
         <div className="field" style={{ flex: 1 }}>
-          <label>Cidade</label>
-          <input value={form.cidade} onChange={set('cidade')} />
+          <label>Cidade{isRequester ? ' *' : ''}</label>
+          <input value={form.cidade} onChange={set('cidade')} required={isRequester} placeholder={isRequester ? 'Obrigatória' : ''} />
         </div>
       </div>
       <div className="field">

@@ -24,8 +24,9 @@ export default function Tickets() {
 
   tickets = tickets.sort((a, b) => {
     const order = { alta: 0, media: 1, baixa: 2 };
-    if (a.status === 'concluido' !== (b.status === 'concluido'))
-      return a.status === 'concluido' ? 1 : -1;
+    const aDone = a.status === 'concluido';
+    const bDone = b.status === 'concluido';
+    if (aDone !== bDone) return aDone ? 1 : -1; // concluídos vão para o fim
     return order[a.urgency] - order[b.urgency] || b.updatedAt.localeCompare(a.updatedAt);
   });
 
@@ -36,9 +37,7 @@ export default function Tickets() {
           <h1>Chamados</h1>
           <p className="muted">{tickets.length} chamado(s)</p>
         </div>
-        {(user.role === 'solicitante' || user.role === 'suporte') && (
-          <Link to="/tickets/new" className="btn btn-primary">➕ Abrir chamado</Link>
-        )}
+        <Link to="/tickets/new" className="btn btn-primary">➕ Abrir chamado</Link>
       </div>
 
       <div className="card card-pad mb">
@@ -69,9 +68,10 @@ export default function Tickets() {
             return (
               <div key={t.id} className="ticket-row" onClick={() => navigate(`/tickets/${t.id}`)}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="t-title">{t.title}</div>
+                  <div className="t-title">{t.urgentAlert && '🚨 '}{t.title}</div>
                   <div className="t-meta">
-                    #{t.id.slice(-4)} · {cat ? `${cat.name} · ` : ''}{t.type} · {timeAgo(t.updatedAt)}
+                    #{t.id.slice(-4)} · {cat ? `${cat.name} · ` : ''}{t.type}
+                    {t.cidade && ` · 📍 ${t.cidade}`} · {timeAgo(t.updatedAt)}
                   </div>
                 </div>
                 {assignee ? (

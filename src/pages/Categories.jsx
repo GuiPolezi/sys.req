@@ -5,7 +5,7 @@ import { categoriesForGroup, createCategory, deleteCategory } from '../lib/domai
 import { Modal, Empty } from '../components/ui';
 
 export default function Categories() {
-  const { activeGroup, refresh } = useAuth();
+  const { user, activeGroup, refresh } = useAuth();
   const [, setLocal] = useState(0);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -16,22 +16,22 @@ export default function Categories() {
 
   const save = () => {
     if (!name.trim()) return;
-    createCategory(activeGroup.id, { name, systems: systems.split(',') });
+    createCategory(activeGroup.id, { name, systems: systems.split(',') }, user);
     setName(''); setSystems(''); setOpen(false); bump();
   };
 
   const remove = (id) => {
     const count = db.filter('tickets', (t) => t.categoryId === id).length;
     if (count > 0 && !confirm(`Esta categoria tem ${count} chamado(s). Eles ficarão sem categoria. Excluir mesmo assim?`)) return;
-    deleteCategory(id); bump();
+    deleteCategory(id, user); bump();
   };
 
   return (
     <div>
       <div className="row between page-head">
         <div>
-          <h1>Categorias de serviço</h1>
-          <p className="muted">Agrupam chamados por sistema/assunto e alimentam as automações.</p>
+          <h1>Categorias de desenvolvedor</h1>
+          <p className="muted">Definem áreas de atuação (Web, Desktop, Infra…). Classificam chamados e o que cada dev atende. RP14</p>
         </div>
         <button className="btn-primary" onClick={() => setOpen(true)}>➕ Nova categoria</button>
       </div>

@@ -222,3 +222,53 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .alert-info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
 .empty { text-align: center; padding: 40px 20px; color: var(--muted); }
 .divider { height: 1px; background: var(--border); margin: 14px 0; }
+
+/* ---------- Badge de navegação (convites) ---------- */
+.nav-badge {
+  margin-left: auto;
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---------- Barra de progresso (XP, ranking, stats) ---------- */
+.progress {
+  height: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.progress-fill {
+  height: 100%;
+  background: #7c3aed;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* ---------- Posição no ranking ---------- */
+.rank-pos {
+  width: 34px;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--muted);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}

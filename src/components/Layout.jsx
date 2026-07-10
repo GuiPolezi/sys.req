@@ -1,12 +1,15 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { can, isTech, invitationsForUser } from '../lib/domain';
 import { Avatar, RoleBadge } from './ui';
 
 export default function Layout({ children }) {
-  const { user, groups, activeGroup, selectGroup, logout } = useAuth();
+  const { user, groups, activeGroup, selectGroup, logout, tick } = useAuth();
   const navigate = useNavigate();
-  const isSuporte = user.role === 'suporte';
-  const isTech = user.role === 'suporte' || user.role === 'dev';
+  const role = user.role;
+  const tech = isTech(role);
+  void tick; // recomputa a contagem de convites a cada mutação
+  const pendingInvites = invitationsForUser(user.id).length;
 
   const handleLogout = () => {
     logout();
@@ -20,28 +23,42 @@ export default function Layout({ children }) {
 
         <NavLink to="/" end className="nav-link">📊 Painel</NavLink>
         <NavLink to="/tickets" className="nav-link">🎫 Chamados</NavLink>
-        {user.role === 'solicitante' && (
+        {(role === 'solicitante' || tech) && (
           <NavLink to="/tickets/new" className="nav-link">➕ Abrir chamado</NavLink>
         )}
+        {tech && <NavLink to="/pool" className="nav-link">📥 Não atribuídos</NavLink>}
 
-        {isTech && (
+        {tech && (
           <>
             <div className="nav-section">Equipe</div>
             <NavLink to="/chat" className="nav-link">💬 Chat interno</NavLink>
+            {can.viewMembers(role) && <NavLink to="/team" className="nav-link">👥 Membros</NavLink>}
+            <NavLink to="/invites" className="nav-link">
+              ✉️ Convites{pendingInvites > 0 && <span className="nav-badge">{pendingInvites}</span>}
+            </NavLink>
+            {can.registerAttendance(role) && <NavLink to="/attendances" className="nav-link">🗒️ Atendimentos</NavLink>}
           </>
         )}
 
-        {isSuporte && (
+        {role === 'suporte' && (
           <>
             <div className="nav-section">Administração</div>
             <NavLink to="/categories" className="nav-link">🗂️ Categorias</NavLink>
-            <NavLink to="/automations" className="nav-link">⚙️ Automações</NavLink>
-            <NavLink to="/team" className="nav-link">👥 Membros & convites</NavLink>
+            <NavLink to="/services" className="nav-link">🧩 Serviços</NavLink>
+            <NavLink to="/ranking" className="nav-link">🏆 Ranking</NavLink>
+            <NavLink to="/audit" className="nav-link">📜 Auditoria</NavLink>
+          </>
+        )}
+        {role === 'dev' && (
+          <>
+            <div className="nav-section">Administração</div>
+            <NavLink to="/services" className="nav-link">🧩 Serviços</NavLink>
           </>
         )}
 
         <div className="spacer" />
-        <div className="row" style={{ padding: '10px', color: '#94a3b8', fontSize: 12 }}>
+        <NavLink to="/profile" className="nav-link">🙍 Meu perfil</NavLink>
+        <div className="row" style={{ padding: '6px 10px', color: '#64748b', fontSize: 11 }}>
           Versão alpha · dados locais
         </div>
       </aside>

@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { createTicket, categoriesForGroup, URGENCY } from '../lib/domain';
-
-const TYPES = ['Solicitação', 'Erro', 'Dúvida', 'Melhoria'];
+import { createTicket, categoriesForGroup, servicesForGroup, URGENCY, TICKET_TYPES } from '../lib/domain';
+import { db } from '../lib/store';
 
 export default function NewTicket() {
   const { user, activeGroup, refresh } = useAuth();
   const navigate = useNavigate();
   const categories = categoriesForGroup(activeGroup.id);
+  const services = servicesForGroup(activeGroup.id);
 
+  const [serviceId, setServiceId] = useState('');
   const [form, setForm] = useState({
     title: '', description: '', type: 'Solicitação',
     categoryId: categories[0]?.id || '', urgency: 'media', cidade: user.cidade || '',
@@ -17,11 +18,26 @@ export default function NewTicket() {
   const [error, setError] = useState('');
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
+  // RCS07 — aplicar serviço padroniza os campos
+  const applyService = (id) => {
+    setServiceId(id);
+    const svc = id ? db.byId('services', id) : null;
+    if (svc) {
+      setForm((f) => ({
+        ...f,
+        title: svc.defaultTitle || f.title,
+        type: svc.ticketType || f.type,
+        categoryId: svc.categoryId || f.categoryId,
+        urgency: svc.urgency || f.urgency,
+      }));
+    }
+  };
+
   const submit = (e) => {
     e.preventDefault();
     setError('');
     if (!form.title.trim()) return setError('Informe um título.');
-    const t = createTicket(activeGroup.id, form, user);
+    const t = createTicket(activeGroup.id, form, user, serviceId || null);
     refresh();
     navigate(`/tickets/${t.id}`);
   };
@@ -30,11 +46,22 @@ export default function NewTicket() {
     <div style={{ maxWidth: 640 }}>
       <div className="page-head">
         <h1>Abrir chamado</h1>
-        <p className="muted">Descreva sua solicitação com o máximo de detalhes.</p>
+        <p className="muted">Use um serviço para padronizar, ou preencha manualmente.</p>
       </div>
 
       <form onSubmit={submit} className="card card-pad">
         {error && <div className="alert alert-error">{error}</div>}
+
+        {services.length > 0 && (
+          <div className="field">
+            <label>🧩 Serviço (opcional)</label>
+            <select value={serviceId} onChange={(e) => applyService(e.target.value)}>
+              <option value="">— Chamado avulso —</option>
+              {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <div className="hint">Preenche tipo, categoria, urgência e atribuição automaticamente.</div>
+          </div>
+        )}
 
         <div className="field">
           <label>Título *</label>
@@ -59,7 +86,7 @@ export default function NewTicket() {
           <div className="field" style={{ flex: 1 }}>
             <label>Tipo</label>
             <select value={form.type} onChange={set('type')}>
-              {TYPES.map((t) => <option key={t}>{t}</option>)}
+              {TICKET_TYPES.map((t) => <option key={t}>{t}</option>)}
             </select>
           </div>
         </div>

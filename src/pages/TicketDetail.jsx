@@ -3,11 +3,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/store';
 import {
-  updateTicket, assignTicket, addAttendance,
+  assignTicket, setStatus, setUrgency, addAttendance,
+  sendToReview, approveReview, rejectReview, toggleUrgentAlert,
   ticketMessages, postTicketMessage,
-  groupMembers, membership, STATUS, URGENCY,
+  groupMembers, isTech, can, STATUS, URGENCY,
 } from '../lib/domain';
 import { StatusBadge, UrgencyBadge, RoleBadge, Avatar, fmtDateTime } from '../components/ui';
+
+// status ajustáveis manualmente (em_analise é definido via "Enviar para análise")
+const MANUAL_STATUS = ['aberto', 'em_andamento', 'aguardando', 'concluido'];
 
 export default function TicketDetail() {
   const { id } = useParams();
@@ -22,18 +26,12 @@ export default function TicketDetail() {
   }
 
   const isSuporte = user.role === 'suporte';
-  const isTech = user.role === 'suporte' || user.role === 'dev';
+  const tech = isTech(user.role);
+  const isAuthor = ticket.createdBy === user.id;
   const author = db.byId('users', ticket.createdBy);
   const assignee = ticket.assignedTo ? db.byId('users', ticket.assignedTo) : null;
   const cat = ticket.categoryId ? db.byId('categories', ticket.categoryId) : null;
-
-  // devs e suporte disponíveis para atribuição
   const assignables = groupMembers(activeGroup).filter((m) => m.role !== 'solicitante');
-
-  const changeStatus = (status) => { updateTicket(ticket.id, { status }); bump(); };
-  const changeAssignee = (userId) => { assignTicket(ticket.id, userId || null); bump(); };
-  const changeUrgency = (urgency) => { updateTicket(ticket.id, { urgency }); bump(); };
-  const takeIt = () => { assignTicket(ticket.id, user.id); bump(); };
 
   return (
     <div>
@@ -41,6 +39,17 @@ export default function TicketDetail() {
         <button className="btn-sm" onClick={() => navigate('/tickets')}>← Chamados</button>
         <span className="muted small">#{ticket.id.slice(-6)}</span>
       </div>
+
+      {ticket.urgentAlert && (
+        <div className="alert" style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c' }}>
+          🚨 <b>Alerta de urgência</b> enviado pelo solicitante — este chamado precisa de atenção imediata.
+        </div>
+      )}
+      {ticket.status === 'em_analise' && (
+        <div className="alert alert-info">
+          🔎 Em análise — aguardando o solicitante <b>{author?.name}</b> confirmar se foi resolvido.
+        </div>
+      )}
 
       <div className="grid" style={{ gridTemplateColumns: '1fr 320px', alignItems: 'start' }}>
         {/* ---------- coluna principal ---------- */}
@@ -66,11 +75,39 @@ export default function TicketDetail() {
 
           <TicketChat ticket={ticket} user={user} onPost={bump} key={tick} />
 
-          {isTech && <Attendances ticket={ticket} user={user} onAdd={bump} />}
+          {tech && <Attendances ticket={ticket} user={user} onAdd={bump} />}
         </div>
 
         {/* ---------- coluna lateral (ações) ---------- */}
         <div className="col" style={{ gap: 16 }}>
+          {/* Ações do solicitante autor: alerta + análise (RCS05 / RCS08) */}
+          {isAuthor && user.role === 'solicitante' && (
+            <div className="card card-pad">
+              <h3>Ações do solicitante</h3>
+              {ticket.status === 'em_analise' ? (
+                <>
+                  <p className="muted small">O time marcou como resolvido. Confere se está tudo certo?</p>
+                  <div className="col" style={{ gap: 6 }}>
+                    <button className="btn-primary btn-sm" style={{ justifyContent: 'center' }}
+                      onClick={() => { approveReview(ticket.id, user); bump(); }}>👍 Aprovar (concluir)</button>
+                    <button className="btn-sm btn-danger" style={{ justifyContent: 'center' }}
+                      onClick={() => { rejectReview(ticket.id, user); bump(); }}>👎 Rejeitar (voltar ao time)</button>
+                  </div>
+                </>
+              ) : ticket.status !== 'concluido' ? (
+                <button
+                  className={ticket.urgentAlert ? 'btn-sm btn-danger' : 'btn-sm'}
+                  style={{ width: '100%', justifyContent: 'center' }}
+                  onClick={() => { toggleUrgentAlert(ticket.id, !ticket.urgentAlert, user); bump(); }}
+                >
+                  {ticket.urgentAlert ? '🔕 Cancelar alerta de urgência' : '🚨 Enviar alerta de urgência'}
+                </button>
+              ) : (
+                <p className="muted small" style={{ margin: 0 }}>Chamado concluído.</p>
+              )}
+            </div>
+          )}
+
           <div className="card card-pad">
             <h3>Responsável</h3>
             {assignee ? (
@@ -88,7 +125,7 @@ export default function TicketDetail() {
             {isSuporte && (
               <div className="field" style={{ marginTop: 12, marginBottom: 0 }}>
                 <label>Atribuir para</label>
-                <select value={ticket.assignedTo || ''} onChange={(e) => changeAssignee(e.target.value)}>
+                <select value={ticket.assignedTo || ''} onChange={(e) => { assignTicket(ticket.id, e.target.value || null, user); bump(); }}>
                   <option value="">— Ninguém —</option>
                   {assignables.map((m) => (
                     <option key={m.userId} value={m.userId}>{m.user.name} ({m.role})</option>
@@ -97,31 +134,43 @@ export default function TicketDetail() {
               </div>
             )}
             {user.role === 'dev' && ticket.assignedTo !== user.id && (
-              <button className="btn-primary btn-sm mt" style={{ width: '100%', justifyContent: 'center' }} onClick={takeIt}>
+              <button className="btn-primary btn-sm mt" style={{ width: '100%', justifyContent: 'center' }}
+                onClick={() => { assignTicket(ticket.id, user.id, user); bump(); }}>
                 Pegar este chamado
               </button>
             )}
           </div>
 
-          {isTech && (
+          {tech && (
             <div className="card card-pad">
               <h3>Status</h3>
               <div className="col" style={{ gap: 6 }}>
-                {Object.entries(STATUS).map(([k, v]) => (
+                {MANUAL_STATUS.map((k) => (
                   <button
                     key={k}
                     className={ticket.status === k ? 'btn-primary btn-sm' : 'btn-sm'}
                     style={{ justifyContent: 'flex-start' }}
-                    onClick={() => changeStatus(k)}
+                    onClick={() => { setStatus(ticket.id, k, user); bump(); }}
                   >
-                    <span className="dot" style={{ background: v.color }} /> {v.label}
+                    <span className="dot" style={{ background: STATUS[k].color }} /> {STATUS[k].label}
                   </button>
                 ))}
               </div>
 
+              {/* RCS08 — enviar para análise do solicitante */}
+              {can.sendToReview(user.role) && ['em_andamento', 'aguardando'].includes(ticket.status) && (
+                <button className="btn-sm mt" style={{ width: '100%', justifyContent: 'center' }}
+                  onClick={() => { sendToReview(ticket.id, user); bump(); }}>
+                  🔎 Enviar para análise do solicitante
+                </button>
+              )}
+              {ticket.status === 'em_analise' && (
+                <p className="muted small mt">Aguardando aprovação do solicitante.</p>
+              )}
+
               <div className="field" style={{ marginTop: 14, marginBottom: 0 }}>
                 <label>Urgência</label>
-                <select value={ticket.urgency} onChange={(e) => changeUrgency(e.target.value)}>
+                <select value={ticket.urgency} onChange={(e) => { setUrgency(ticket.id, e.target.value, user); bump(); }}>
                   {Object.entries(URGENCY).map(([k, v]) => (
                     <option key={k} value={k}>{v.label}</option>
                   ))}
@@ -136,7 +185,7 @@ export default function TicketDetail() {
 }
 
 // -------------------------------------------------------------
-//  Chat do chamado (solicitante + técnicos)
+//  Chat do chamado (RCS03)
 // -------------------------------------------------------------
 function TicketChat({ ticket, user, onPost }) {
   const [text, setText] = useState('');

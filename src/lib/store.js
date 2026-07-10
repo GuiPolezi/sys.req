@@ -7,7 +7,7 @@
 //  mantendo a mesma assinatura — o resto do app não muda.
 // =============================================================
 
-const NS = 'helpdesk_alpha_v1';
+const NS = 'helpdesk_alpha_v2';
 
 const COLLECTIONS = [
   'users',
@@ -16,7 +16,10 @@ const COLLECTIONS = [
   'tickets',
   'ticketMessages',
   'internalMessages',
-  'automations',
+  'services',      // RCS04/07 — templates de criação de tickets
+  'invitations',   // RP02/RP06 — convites com aceite/recusa
+  'attendances',   // RCS12 — registro de atendimentos avulsos
+  'auditLog',      // RP16 — log de auditoria por grupo
 ];
 
 function keyFor(name) {

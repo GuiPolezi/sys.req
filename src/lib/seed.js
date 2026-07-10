@@ -1,7 +1,7 @@
 // =============================================================
 //  SEED — popula dados de demonstração na primeira execução
 // =============================================================
-import { db, isSeeded, markSeeded } from './store';
+import { db, isSeeded, markSeeded, COLLECTIONS, resetAll } from './store';
 import {
   createUser,
   createGroup,
@@ -9,7 +9,10 @@ import {
   createTicket,
   joinGroupByCode,
   updateMemberCategories,
-  createAutomation,
+  createService,
+  registerAttendance,
+  createInvitation,
+  sendToReview,
   postTicketMessage,
   postInternalMessage,
 } from './domain';
@@ -32,58 +35,98 @@ export function seedIfNeeded() {
   });
   const davi = createUser({
     name: 'Davi Cliente', login: 'davi', email: 'davi@demo.com',
-    password: '123', role: 'solicitante', cidade: 'Santos',
+    password: '123', role: 'solicitante', cidade: 'Itajubá',
+  });
+  const elis = createUser({
+    name: 'Elis Cliente', login: 'elis', email: 'elis@demo.com',
+    password: '123', role: 'solicitante', cidade: 'Itajubá',
+  });
+  // dev sem grupo, para demonstrar o fluxo de convite (RP06)
+  createUser({
+    name: 'Fabio Dev', login: 'fabio', email: 'fabio@demo.com',
+    password: '123', role: 'dev', cidade: 'São Paulo',
   });
 
-  // --- grupo ----------------------------------------------------
-  const group = createGroup('Equipe TI — Cartório', ana);
+  // --- grupo (Nome + Descrição, RP09) ---------------------------
+  const group = createGroup(
+    { name: 'Equipe TI — Cartório', description: 'Atendimento e desenvolvimento dos sistemas do cartório.' },
+    ana,
+  );
 
-  // --- categorias de serviço -----------------------------------
-  const siscam = createCategory(group.id, { name: 'Siscam', systems: ['Siscam 8', 'Siscam 9'] });
-  const siave = createCategory(group.id, { name: 'Siave', systems: ['Siave Web'] });
-  const workflow = createCategory(group.id, { name: 'Workflow', systems: ['Workflow', 'Firmas'] });
-  createCategory(group.id, { name: 'Escrituras', systems: ['Escrituras', 'Site'] });
+  // --- categorias de desenvolvedor (RP14) -----------------------
+  const web = createCategory(group.id, { name: 'Desenvolvimento Web', systems: ['Siscam Web', 'Site'] }, ana);
+  const desktop = createCategory(group.id, { name: 'Desenvolvimento Desktop', systems: ['Siscam 9', 'Siave'] }, ana);
+  createCategory(group.id, { name: 'Infraestrutura', systems: ['Rede', 'Servidores'] }, ana);
 
   // --- entrada dos demais membros ------------------------------
   joinGroupByCode(bruno, group.techInviteCode);
   joinGroupByCode(carla, group.techInviteCode);
   joinGroupByCode(davi, group.requesterCode);
+  joinGroupByCode(elis, group.requesterCode);
 
-  // devs atendem categorias específicas
-  updateMemberCategories(group.id, bruno.id, [siscam.id, workflow.id]);
-  updateMemberCategories(group.id, carla.id, [siave.id]);
+  // devs escolhem/atendem categorias específicas (RP15)
+  updateMemberCategories(group.id, bruno.id, [desktop.id], ana);
+  updateMemberCategories(group.id, carla.id, [web.id], ana);
 
-  // --- automação: Siscam + urgência alta -> Bruno --------------
-  createAutomation(group.id, {
-    name: 'Siscam urgente para Bruno',
-    categoryId: siscam.id,
+  // convite pendente para o Fabio (aparece em "Convites")
+  createInvitation(group.id, 'fabio', ana);
+
+  // --- serviço padrão (RCS04/07) --------------------------------
+  createService(group.id, {
+    name: 'Erro em site (Web)',
+    ticketType: 'Erro',
+    defaultTitle: 'Erro no site: ',
+    description: 'Padroniza chamados de erro do site para a equipe Web.',
+    categoryId: web.id,
+    assignTo: carla.id,
     urgency: 'alta',
-    assignTo: bruno.id,
-  });
+  }, ana);
+  createService(group.id, {
+    name: 'Dúvida Desktop',
+    ticketType: 'Dúvida',
+    defaultTitle: 'Dúvida sobre ',
+    categoryId: desktop.id,
+    assignTo: null,
+    urgency: 'baixa',
+  }, ana);
 
   // --- tickets --------------------------------------------------
   const t1 = createTicket(group.id, {
     title: 'Siscam 9 não abre após atualização',
     description: 'Ao abrir o Siscam 9 aparece erro de conexão com o banco.',
-    type: 'Erro', categoryId: siscam.id, urgency: 'alta',
+    type: 'Erro', categoryId: desktop.id, urgency: 'alta',
   }, davi);
 
   createTicket(group.id, {
     title: 'Dúvida sobre lançamento no Siave',
-    description: 'Como faço para estornar um lançamento no Siave Web?',
-    type: 'Dúvida', categoryId: siave.id, urgency: 'baixa',
+    description: 'Como faço para estornar um lançamento no Siave?',
+    type: 'Dúvida', categoryId: desktop.id, urgency: 'baixa',
+  }, elis);
+
+  // ticket sem atribuição -> aparece no pool (RCS06)
+  createTicket(group.id, {
+    title: 'Melhoria: filtro por data no site',
+    description: 'Seria útil filtrar registros por período no site.',
+    type: 'Melhoria', categoryId: web.id, urgency: 'media',
   }, davi);
 
-  createTicket(group.id, {
-    title: 'Solicitar acesso ao Workflow',
-    description: 'Novo funcionário precisa de acesso ao módulo de Firmas.',
-    type: 'Solicitação', categoryId: workflow.id, urgency: 'media',
-  }, davi);
+  // ticket em análise (RCS08)
+  const t4 = createTicket(group.id, {
+    title: 'Ajuste no rodapé do site',
+    description: 'Atualizar telefone de contato no rodapé.',
+    type: 'Ajuste', categoryId: web.id, urgency: 'media',
+  }, elis);
+  db.update('tickets', t4.id, { assignedTo: carla.id, status: 'em_andamento' });
+  sendToReview(t4.id, carla);
+
+  // --- atendimentos avulsos do suporte (RCS12) ------------------
+  registerAttendance(group.id, { cidade: 'Itajubá', client: 'Cartório 1º Ofício', note: 'Suporte presencial na rede.' }, ana);
+  registerAttendance(group.id, { cidade: 'Pouso Alegre', client: 'Cartório Central', note: 'Configuração de impressora fiscal.' }, ana);
 
   // --- conversas de exemplo ------------------------------------
   postTicketMessage(t1.id, davi.id, 'Bom dia! O erro começou hoje de manhã.');
   postTicketMessage(t1.id, bruno.id, 'Bom dia, Davi. Vou verificar a conexão com o servidor.');
-  postInternalMessage(group.id, ana.id, 'Pessoal, priorizem os chamados de Siscam hoje.');
+  postInternalMessage(group.id, ana.id, 'Pessoal, priorizem os chamados do site hoje.');
   postInternalMessage(group.id, bruno.id, 'Ok, já peguei o do Siscam 9.');
 
   markSeeded();
@@ -92,13 +135,7 @@ export function seedIfNeeded() {
 
 // exportado para o botão "recarregar dados demo"
 export function forceReseed() {
-  db.replaceAll('users', []);
-  db.replaceAll('groups', []);
-  db.replaceAll('categories', []);
-  db.replaceAll('tickets', []);
-  db.replaceAll('ticketMessages', []);
-  db.replaceAll('internalMessages', []);
-  db.replaceAll('automations', []);
-  localStorage.removeItem('helpdesk_alpha_v1:__seeded');
+  resetAll();
+  COLLECTIONS.forEach((c) => db.replaceAll(c, []));
   seedIfNeeded();
 }
