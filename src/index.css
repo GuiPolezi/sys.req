@@ -150,6 +150,8 @@ label { display: block; font-weight: 600; font-size: 12.5px; margin-bottom: 6px;
 
 /* ---------- App shell ---------- */
 .app-shell { display: flex; min-height: 100vh; }
+
+/* --- Sidebar: 3 regiões — marca fixa / navegação com scroll próprio / rodapé fixo --- */
 .sidebar {
   width: 244px;
   background: var(--sidebar);
@@ -157,41 +159,97 @@ label { display: block; font-weight: 600; font-size: 12.5px; margin-bottom: 6px;
   color: var(--text-soft);
   display: flex;
   flex-direction: column;
-  padding: 14px 12px;
-  gap: 2px;
   position: sticky;
   top: 0;
   height: 100vh;
   flex-shrink: 0;
   z-index: 40;
+  overflow: hidden;          /* o menu nunca faz a página rolar */
+  transition: width 0.18s ease;
 }
+.sidebar-head { flex-shrink: 0; padding: 14px 12px 8px; }
+.sidebar-nav {
+  flex: 1;
+  min-height: 0;             /* habilita o scroll interno da navegação */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sidebar-foot {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  padding: 8px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nav-group { display: flex; flex-direction: column; gap: 2px; }
+
 .sidebar .brand {
   font-family: var(--font-serif);
   font-weight: 600;
   color: var(--text);
   font-size: 19px;
-  padding: 8px 10px 16px;
+  padding: 4px 10px 6px;
   display: flex;
   align-items: center;
   gap: 9px;
   letter-spacing: -0.01em;
+  white-space: nowrap;
 }
+.brand-ico { font-size: 20px; }
+
 .nav-link {
   color: var(--text-soft);
   padding: 8px 11px;
   border-radius: 9px;
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
   font-weight: 500;
   font-size: 13.5px;
   transition: background 0.13s ease, color 0.13s ease;
+  position: relative;
 }
-.nav-link:hover { background: rgba(35, 33, 28, 0.05); color: var(--text); }
+.nav-ico { width: 18px; flex-shrink: 0; text-align: center; font-size: 14px; }
+.nav-txt { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-link:hover { background: rgba(35, 33, 28, 0.06); color: var(--text); }
 .nav-link.active { background: var(--primary); color: #fff; box-shadow: var(--shadow-xs); }
 .nav-link.active:hover { background: var(--primary-dark); color: #fff; }
-.nav-section { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; padding: 16px 12px 6px; font-weight: 700; }
-.sidebar .spacer { flex: 1; }
+.nav-section { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; padding: 14px 12px 5px; font-weight: 700; }
+
+.collapse-btn {
+  margin-top: 4px;
+  justify-content: flex-start;
+  gap: 10px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  padding: 7px 11px;
+}
+.collapse-btn:hover { background: rgba(35, 33, 28, 0.06); border-color: transparent; }
+
+/* --- Modo "rail" (só ícones) — apenas no desktop --- */
+@media (min-width: 861px) {
+  .sidebar.rail { width: 70px; }
+  .sidebar.rail .nav-txt,
+  .sidebar.rail .brand-txt { display: none; }
+  .sidebar.rail .sidebar-head,
+  .sidebar.rail .sidebar-nav,
+  .sidebar.rail .sidebar-foot { padding-left: 9px; padding-right: 9px; }
+  .sidebar.rail .brand { justify-content: center; padding: 4px 0 6px; }
+  .sidebar.rail .nav-link,
+  .sidebar.rail .collapse-btn { justify-content: center; padding: 9px 0; }
+  .sidebar.rail .nav-section { text-align: center; font-size: 9px; letter-spacing: 0.04em; padding: 12px 0 4px; }
+  .sidebar.rail .nav-badge {
+    position: absolute; top: 2px; right: 6px; margin-left: 0;
+    min-width: 16px; height: 16px; font-size: 9px; padding: 0 4px;
+  }
+}
 
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--content-bg); }
 .topbar {
@@ -207,8 +265,9 @@ label { display: block; font-weight: 600; font-size: 12.5px; margin-bottom: 6px;
   top: 0;
   z-index: 30;
 }
-.topbar .title { font-weight: 600; font-size: 15.5px; letter-spacing: -0.01em; }
+.topbar .title { font-weight: 600; font-size: 15.5px; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topbar .spacer { flex: 1; }
+.group-select { width: auto; max-width: 240px; }
 .topbar select { width: auto; font-weight: 500; }
 .content { padding: 26px; max-width: 1180px; width: 100%; margin: 0 auto; }
 
@@ -465,26 +524,52 @@ code {
 .rich a { text-decoration: underline; }
 
 /* ---------- Responsividade ---------- */
+
+/* Tablet / mobile: o menu vira gaveta (drawer) sobre um overlay. */
 @media (max-width: 860px) {
   .menu-btn { display: inline-flex; }
   .sidebar {
     position: fixed;
     left: 0; top: 0;
     height: 100vh;
+    width: 268px;              /* no drawer sempre completo (nunca "rail") */
     transform: translateX(-100%);
     transition: transform 0.22s ease;
     box-shadow: var(--shadow-lg);
-    width: 260px;
   }
   .sidebar.open { transform: translateX(0); }
-  .sidebar-overlay.show { display: block; position: fixed; inset: 0; background: rgba(35,33,28,0.35); z-index: 35; }
+  .sidebar-overlay.show {
+    display: block; position: fixed; inset: 0;
+    background: rgba(35, 33, 28, 0.4); z-index: 35;
+  }
+  .collapse-btn { display: none; }
   .content { padding: 18px 16px; }
-  .topbar { padding: 0 16px; }
+  .topbar { padding: 0 14px; gap: 10px; }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 640px) {
   h1 { font-size: 22px; }
   .card-pad { padding: 16px; }
+  .content { padding: 16px 13px; }
   .ticket-row { padding: 12px 14px; flex-wrap: wrap; }
-  .topbar .col { display: none; }  /* esconde nome/email, mantém avatar */
+  .topbar-user .col { display: none; }   /* esconde nome/e-mail, mantém avatar */
+  .topbar .title { max-width: 42vw; }
+  .group-select { max-width: 42vw; }
+  .stats { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 10px; }
+  .stat { padding: 14px; }
+  .stat .n { font-size: 25px; }
+  .page-head { margin-bottom: 16px; }
+  .modal-body, .modal-head, .modal-foot { padding: 14px; }
+  /* linhas de campos lado a lado passam a quebrar */
+  form .row, .card-pad .row { flex-wrap: wrap; }
+  form .row > .field, .card-pad .row > .field { min-width: 160px; }
+}
+
+@media (max-width: 480px) {
+  .topbar-role { display: none; }        /* libera espaço na barra superior */
+  .role-pick { grid-template-columns: 1fr !important; }
+  .auth-wrap { padding: 14px; }
+  .code-box { font-size: 15px; letter-spacing: 2px; }
+  .chat-input { flex-wrap: wrap; }
+  .rank-pos { width: 26px; }
 }

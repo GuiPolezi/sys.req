@@ -94,7 +94,7 @@ export default function Dashboard() {
         <div className="card card-pad">
           <h3>Por status</h3>
           {tickets.length === 0 ? <p className="muted small">Sem dados.</p> : (
-            <div className="row" style={{ gap: 18, marginTop: 6, alignItems: 'center' }}>
+            <div className="row wrap" style={{ gap: 18, marginTop: 6, alignItems: 'center' }}>
               <Donut segments={statusSeg} />
               <div className="col" style={{ gap: 8, flex: 1 }}>
                 {statusSeg.filter((s) => s.value > 0).map((s) => (

@@ -8,27 +8,54 @@ import { Avatar } from '../components/ui';
 function NoGroupShell({ children }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
   const tech = isTech(user.role);
   const pending = tech ? invitationsForUser(user.id).length : 0;
+  const close = () => setMenuOpen(false);
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">🛟 HelpDesk</div>
-        <NavLink to="/" end className="nav-link">🏠 Grupos</NavLink>
-        <NavLink to="/profile" className="nav-link">🙍 Meu perfil</NavLink>
-        {tech && (
-          <NavLink to="/invites" className="nav-link">
-            ✉️ Convites{pending > 0 && <span className="nav-badge">{pending}</span>}
-          </NavLink>
-        )}
-        <div className="spacer" />
-        <div className="row" style={{ gap: 8, padding: 10 }}>
-          <Avatar name={user.name} size="sm" />
-          <span className="small" style={{ color: 'var(--text-soft)' }}>{user.name}</span>
+      <div className={`sidebar-overlay ${menuOpen ? 'show' : ''}`} onClick={close} />
+      <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
+        <div className="sidebar-head">
+          <div className="brand">
+            <span className="brand-ico">🛟</span>
+            <span className="brand-txt">HelpDesk</span>
+          </div>
         </div>
-        <button className="btn-sm" onClick={() => { logout(); navigate('/login'); }}>Sair</button>
+        <nav className="sidebar-nav">
+          <NavLink to="/" end className="nav-link" onClick={close}>
+            <span className="nav-ico">🏠</span><span className="nav-txt">Grupos</span>
+          </NavLink>
+          <NavLink to="/profile" className="nav-link" onClick={close}>
+            <span className="nav-ico">🙍</span><span className="nav-txt">Meu perfil</span>
+          </NavLink>
+          {tech && (
+            <NavLink to="/invites" className="nav-link" onClick={close}>
+              <span className="nav-ico">✉️</span><span className="nav-txt">Convites</span>
+              {pending > 0 && <span className="nav-badge">{pending}</span>}
+            </NavLink>
+          )}
+        </nav>
+        <div className="sidebar-foot">
+          <div className="row" style={{ gap: 8, padding: '4px 6px 8px' }}>
+            <Avatar name={user.name} size="sm" />
+            <span className="small nav-txt" style={{ color: 'var(--text-soft)' }}>{user.name}</span>
+          </div>
+          <button className="btn-sm" onClick={() => { logout(); navigate('/login'); }}>Sair</button>
+        </div>
       </aside>
-      <div className="main"><div className="content">{children}</div></div>
+      <div className="main">
+        <header className="topbar">
+          <button className="menu-btn btn-sm" onClick={() => setMenuOpen((v) => !v)} aria-label="Abrir menu">☰</button>
+          <span className="title">Sem grupo ativo</span>
+          <div className="spacer" />
+          <div className="row topbar-user" style={{ gap: 8 }}>
+            <Avatar name={user.name} size="sm" />
+            <div className="col"><span style={{ fontWeight: 600, fontSize: 13 }}>{user.name}</span></div>
+          </div>
+        </header>
+        <div className="content">{children}</div>
+      </div>
     </div>
   );
 }

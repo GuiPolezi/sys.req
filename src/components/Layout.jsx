@@ -1,95 +1,118 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { can, isTech, invitationsForUser } from '../lib/domain';
 import { Avatar, RoleBadge } from './ui';
 
+const RAIL_KEY = 'helpdesk_sidebar_rail';
+
 export default function Layout({ children }) {
   const { user, groups, activeGroup, selectGroup, logout, tick } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [rail, setRail] = useState(() => localStorage.getItem(RAIL_KEY) === '1');
+
+  useEffect(() => { localStorage.setItem(RAIL_KEY, rail ? '1' : '0'); }, [rail]);
+
   const role = user.role;
   const tech = isTech(role);
   void tick; // recomputa a contagem de convites a cada mutação
   const pendingInvites = invitationsForUser(user.id).length;
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  // ----- itens de navegação, agrupados por seção -----
+  const sections = [
+    {
+      items: [
+        { to: '/', end: true, icon: '📊', label: 'Painel' },
+        { to: '/tickets', icon: '🎫', label: 'Chamados' },
+        { to: '/tickets/new', icon: '➕', label: 'Abrir chamado' },
+        tech && { to: '/assigned', icon: '📌', label: 'Atribuídos a mim' },
+        tech && { to: '/pool', icon: '📥', label: 'Não atribuídos' },
+      ],
+    },
+    tech && {
+      title: 'Equipe',
+      items: [
+        { to: '/chat', icon: '💬', label: 'Chat interno' },
+        can.viewMembers(role) && { to: '/team', icon: '👥', label: 'Membros' },
+        { to: '/invites', icon: '✉️', label: 'Convites', badge: pendingInvites },
+        can.registerAttendance(role) && { to: '/attendances', icon: '🗒️', label: 'Atendimentos' },
+      ],
+    },
+    role === 'suporte' && {
+      title: 'Administração',
+      items: [
+        { to: '/categories', icon: '🗂️', label: 'Categorias' },
+        { to: '/systems', icon: '🖥️', label: 'Sistemas' },
+        { to: '/services', icon: '🧩', label: 'Serviços' },
+        { to: '/ranking', icon: '🏆', label: 'Ranking' },
+        { to: '/audit', icon: '📜', label: 'Auditoria' },
+      ],
+    },
+    role === 'dev' && {
+      title: 'Administração',
+      items: [{ to: '/services', icon: '🧩', label: 'Serviços' }],
+    },
+  ].filter(Boolean);
 
+  const handleLogout = () => { logout(); navigate('/login'); };
   const close = () => setMenuOpen(false);
+
+  const Item = ({ to, end, icon, label, badge }) => (
+    <NavLink to={to} end={end} className="nav-link" title={label} onClick={close}>
+      <span className="nav-ico">{icon}</span>
+      <span className="nav-txt">{label}</span>
+      {badge > 0 && <span className="nav-badge">{badge}</span>}
+    </NavLink>
+  );
 
   return (
     <div className="app-shell">
       <div className={`sidebar-overlay ${menuOpen ? 'show' : ''}`} onClick={close} />
-      <aside className={`sidebar ${menuOpen ? 'open' : ''}`} onClick={close}>
-        <div className="brand">🛟 HelpDesk</div>
 
-        <NavLink to="/" end className="nav-link">📊 Painel</NavLink>
-        <NavLink to="/tickets" className="nav-link">🎫 Chamados</NavLink>
-        {(role === 'solicitante' || tech) && (
-          <NavLink to="/tickets/new" className="nav-link">➕ Abrir chamado</NavLink>
-        )}
-        {tech && <NavLink to="/assigned" className="nav-link">📌 Atribuídos a mim</NavLink>}
-        {tech && <NavLink to="/pool" className="nav-link">📥 Não atribuídos</NavLink>}
+      <aside className={`sidebar ${menuOpen ? 'open' : ''} ${rail ? 'rail' : ''}`}>
+        <div className="sidebar-head">
+          <div className="brand">
+            <span className="brand-ico">🛟</span>
+            <span className="brand-txt">HelpDesk</span>
+          </div>
+        </div>
 
-        {tech && (
-          <>
-            <div className="nav-section">Equipe</div>
-            <NavLink to="/chat" className="nav-link">💬 Chat interno</NavLink>
-            {can.viewMembers(role) && <NavLink to="/team" className="nav-link">👥 Membros</NavLink>}
-            <NavLink to="/invites" className="nav-link">
-              ✉️ Convites{pendingInvites > 0 && <span className="nav-badge">{pendingInvites}</span>}
-            </NavLink>
-            {can.registerAttendance(role) && <NavLink to="/attendances" className="nav-link">🗒️ Atendimentos</NavLink>}
-          </>
-        )}
+        <nav className="sidebar-nav">
+          {sections.map((sec, i) => (
+            <div key={i} className="nav-group">
+              {sec.title && <div className="nav-section">{sec.title}</div>}
+              {sec.items.filter(Boolean).map((it) => <Item key={it.to} {...it} />)}
+            </div>
+          ))}
+        </nav>
 
-        {role === 'suporte' && (
-          <>
-            <div className="nav-section">Administração</div>
-            <NavLink to="/categories" className="nav-link">🗂️ Categorias</NavLink>
-            <NavLink to="/systems" className="nav-link">🖥️ Sistemas</NavLink>
-            <NavLink to="/services" className="nav-link">🧩 Serviços</NavLink>
-            <NavLink to="/ranking" className="nav-link">🏆 Ranking</NavLink>
-            <NavLink to="/audit" className="nav-link">📜 Auditoria</NavLink>
-          </>
-        )}
-        {role === 'dev' && (
-          <>
-            <div className="nav-section">Administração</div>
-            <NavLink to="/services" className="nav-link">🧩 Serviços</NavLink>
-          </>
-        )}
-
-        <div className="spacer" />
-        <NavLink to="/groups" className="nav-link">🗃️ Meus grupos</NavLink>
-        <NavLink to="/profile" className="nav-link">🙍 Meu perfil</NavLink>
-        <div className="row" style={{ padding: '6px 11px', color: 'var(--muted)', fontSize: 11 }}>
-          Versão alpha · dados locais
+        <div className="sidebar-foot">
+          <Item to="/groups" icon="🗃️" label="Meus grupos" />
+          <Item to="/profile" icon="🙍" label="Meu perfil" />
+          <button className="collapse-btn" onClick={() => setRail((v) => !v)} title={rail ? 'Expandir menu' : 'Recolher menu'}>
+            <span className="nav-ico">{rail ? '»' : '«'}</span>
+            <span className="nav-txt">Recolher</span>
+          </button>
         </div>
       </aside>
 
       <div className="main">
         <header className="topbar">
-          <button className="menu-btn btn-sm" onClick={() => setMenuOpen((v) => !v)} aria-label="Menu">☰</button>
+          <button className="menu-btn btn-sm" onClick={() => setMenuOpen((v) => !v)} aria-label="Abrir menu">☰</button>
+
           {groups.length > 1 ? (
-            <select
-              style={{ width: 'auto' }}
-              value={activeGroup.id}
-              onChange={(e) => selectGroup(e.target.value)}
-            >
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>{g.name}</option>
-              ))}
+            <select className="group-select" value={activeGroup.id} onChange={(e) => selectGroup(e.target.value)}>
+              {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           ) : (
             <span className="title">{activeGroup.name}</span>
           )}
+
           <div className="spacer" />
-          <RoleBadge role={user.role} />
-          <div className="row" style={{ gap: 8 }}>
+
+          <span className="topbar-role"><RoleBadge role={user.role} /></span>
+          <div className="row topbar-user" style={{ gap: 8 }}>
             <Avatar name={user.name} size="sm" />
             <div className="col">
               <span style={{ fontWeight: 600, fontSize: 13 }}>{user.name}</span>
