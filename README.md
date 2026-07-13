@@ -3,7 +3,11 @@
 Sistema de organização de solicitações e atendimentos (helpdesk) para **validar requisitos**
 antes de construir a versão real. Continua **100% em `localStorage`** — sem backend.
 
-> Projeto e requisitos organizados em [`docs/DESIGN.md`](docs/DESIGN.md) (com diagramas UML).
+## Documentação
+
+- **[`docs/SISTEMA.md`](docs/SISTEMA.md)** — documentação completa: arquitetura, modelo de dados,
+  funcionalidades, permissões, telas, design e limitações. **Comece por aqui.**
+- [`docs/DESIGN.md`](docs/DESIGN.md) — requisitos organizados (RC/RP/RCS), requisitos não-funcionais e diagramas UML.
 
 ## Como rodar
 
