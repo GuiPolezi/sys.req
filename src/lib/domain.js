@@ -845,7 +845,22 @@ export function channelUnread(groupId, userId, channel) {
       m.userId !== userId && m.at > since).length;
 }
 
-export function internalUnreadTotal(group, userId) {
-  const channels = ['geral', ...categoriesForGroup(group.id).map((c) => c.id)];
-  return channels.reduce((sum, ch) => sum + channelUnread(group.id, userId, ch), 0);
+// Canais visíveis ao usuário: 'geral' + categorias.
+// O suporte vê todas; o desenvolvedor vê apenas as categorias em que atua.
+export function channelsForUser(group, user) {
+  const cats = categoriesForGroup(group.id);
+  const geral = { id: 'geral', name: 'Geral', icon: '💬' };
+  if (user.role === 'suporte') {
+    return [geral, ...cats.map((c) => ({ id: c.id, name: c.name, icon: '🗂️', color: c.color }))];
+  }
+  const mine = membership(group, user.id)?.categoryIds || [];
+  return [
+    geral,
+    ...cats.filter((c) => mine.includes(c.id)).map((c) => ({ id: c.id, name: c.name, icon: '🗂️', color: c.color })),
+  ];
+}
+
+export function internalUnreadTotal(group, user) {
+  return channelsForUser(group, user)
+    .reduce((sum, ch) => sum + channelUnread(group.id, user.id, ch.id), 0);
 }

@@ -22,7 +22,7 @@ export default function Layout({ children }) {
   void tick; // recomputa os contadores a cada mutação
   const pendingInvites = invitationsForUser(user.id).length;
   const unread = unreadNotifications(activeGroup.id, user.id);
-  const chatUnread = tech ? internalUnreadTotal(activeGroup, user.id) : 0;
+  const chatUnread = tech ? internalUnreadTotal(activeGroup, user) : 0;
   const poolCount = tech ? unassignedTickets(activeGroup.id).length : 0;
 
   // ----- itens de navegação, agrupados por seção -----

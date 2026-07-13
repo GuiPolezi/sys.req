@@ -1,0 +1,90 @@
+Help-desk-0-0-2 Testes de Produção
+
+Realizando Testes de Produção:
+
+----------------------------------------------------
+Usuário Suporte
+- Nome: Guilherme
+- login: guisup
+- e-mail: Guilherme.polezi@sinoinformatica.com.br
+- senha: gui123
+----------------------------------------------------
+Usuário Dev
+- nome: Guylherme
+- login: guidev
+- e-mail: gui@mail.com
+- senha: gui123
+----------------------------------------------------
+Usuário Solicitante
+- Nome: Don Guillermo
+- login: dongui
+- cidade: Araras
+- E-mail: dongui@mail.com
+- senha: gui123
+---------------------------------------------------
+Usuário solicitante 2
+
+
+Validações e Comentários
+######################################
+
+Primeiro problema encontrado:
+- Criei um usuário solicitante sem inserir o código do grupo. No formulário de cadastro obtive uma mensagem de erro solicitando o código, mas ao tentar logar, o usuário estava lá criado. Então esta faltando o bloqueio do cadastro em si, sem código de grupo.
+- Encontrei novamente o mesmo problema mas por um procedimento diferente. Inseri o código de técnico para criar o usuário solicitante, apenas para teste, e deu erro (isso esta ok). Entretanto, o usuário foi cadastrado mesmo assim (mas não esta em nenhum grupo)
+
+
+Ajuste:
+- Parte da equipe; Temos a página Membros que mostra varias informações para o técnico suporte. Mas acredito que seria melhor e mais eficiente criar uma nova aba - Configurações - na equipe, para deixar todas as configurações (ate mesmo de convite) nessa página. Se possível adicionar novas configurações que esqueci de mencionar
+
+
+<User Suporte>
+Configurando Grupo: 
+- Aparentemente, todos esses registros de grupos (categorias, sistemas, serviços) não podem ser editados. Então, deve-se adicionar a possibilidade de editar e também adicionar uma mensagem de confirmação quando clicarem em excluir
+
+1. Criando Categorias de Dev:
+	- Primeira divergência encontrada: Na categoria solicita o campo "sistema", porém esse campo é digitavel. Aqui o ideal seria aparecer os sistemas cadastrados com aquela respectiva categoria.
+
+2. Criando Sistemas: "Problema" relatado acima.
+
+3. Criando Serviço
+	- Na criação do serviço, podemos definir a atribuição para algum técnico, dessa forma padroniza a atribuição. Mas senti falta de poder adicionar a atribuição para alguma categoria. Assim cria-se uma automação de serviço para uma categoria, sem precisar especificar o Desenvolvedor. Também ajustar para que tenha um algoritmo que faça a atribuição por categoria de forma automática onde ele visualiza qual dev esta com menos tickets no momento e envia para ele.
+
+	(Criar dashboard privado para a equipe com a seguinte visualização para os técnicos: Visualização em gráfico de coluna para visualizar quantidade de tickets atribuídas por técnico - Se já existir em algum lugar essa visualização, então desconsidere)
+
+	(Aqui na aba serviços tive uma ideia: implemente se for boa e reformule se for necessário: Ter vários serviços para um sistema. Cada sistema ter seus serviços, assim quando for criar o chamado selecionamos o sistema e depois os serviços.)
+
+
+Registrando Atendimento:
+- Ter a possibilidade de armazenar as informações dos clientes no registro de atendimento. Isso deve ser apenas nessa área. Assim, conforme o passar do tempo e quando houver muita informação, o suporte apenas seleciona o cliente e escreve a descrição do que foi feito, facilitando o dinamismo na criação. Também deve haver a possibilidade de apenas digitar o nome e cidade do cliente manualmente.
+
+- Outra visualização que gostaria que aparecesse, especificamente para a página atendimentos: ter em alguma área ou um botão que abre informações a visualização de Atendimentos por técnico; Visualizar quantos atendimentos os técnicos fizeram no dia ou em outras datas.
+
+
+
+Abertura de Chamados:
+- O card de um chamado (meu serviço criou esse card) esta tendo o texto vazado. Tenho um card que tem uma categoria de nome extenso, o nome ta saindo do card.
+
+<User Solicitante>
+
+Abrindo Chamado:
+- Aqui observei o seguinte: Na criação de serviço está faltando poder selecionar o sistema afetado; Assim quando eu for abrir um chamado de um serviço, não precise selecionar o sistema afetado (mas se eu quiser posso)
+
+Descrição do chamado: O texto esta saindo ao contrario. Não esta funcionando corretamente.
+
+Nova aba para Solicitante:
+- Aba de notificações ou algo do tipo para visualizar notificações dos chamados - Se houver uma nova mensagem notifica, alterar status, notifica, etc..
+
+
+## Chamados não atribuídos
+- Mostrar também uma quantidade (em números) dos chamados não atribuídos - para melhorar a visualização de informações
+
+
+## Chat Interno
+- Mostrar notificação nessa aba também.
+
+
+
+Aparecer notificação para o usuário solicitante, de alguma forma (pense na melhor maneira para tornar intuitivo e bonito ao usuari), de chamados que foram encaminhados para analise pelo responsável por fazer o chamado.
+
+
+Quando o usuário solicitante marcar como concluído o chamado (opção feita através do envio para analise) encerrar chat do chamado e qualquer outra edição possivel
