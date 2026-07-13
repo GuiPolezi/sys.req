@@ -4,13 +4,15 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/store';
 import {
   assignTicket, setStatus, setUrgency, addAttendance,
-  sendToReview, approveReview, rejectReview, toggleUrgentAlert,
+  sendToReview, approveReview, rejectReview, toggleUrgentAlert, reopenTicket,
   ticketMessages, postTicketMessage,
-  groupMembers, isTech, can, isTicketOwner, canChatOnTicket, STATUS, URGENCY,
+  groupMembers, isTech, can, isTicketOwner, isTicketClosed, canEditTicket, canChatOnTicket,
+  ticketRequesterId, STATUS, URGENCY,
 } from '../lib/domain';
 import { StatusBadge, UrgencyBadge, RoleBadge, Avatar, fmtDateTime } from '../components/ui';
 import { RichView } from '../components/RichText';
 
+// status ajustáveis manualmente (em_analise vem do botão "Enviar para análise")
 const MANUAL_STATUS = ['aberto', 'em_andamento', 'aguardando', 'concluido'];
 
 export default function TicketDetail() {
@@ -27,9 +29,12 @@ export default function TicketDetail() {
 
   const isSuporte = user.role === 'suporte';
   const tech = isTech(user.role);
-  const isAuthor = ticket.createdBy === user.id;
-  const owner = isTicketOwner(ticket, user);        // responsável pelo ticket
+  const closed = isTicketClosed(ticket);            // concluído = encerrado (v0.0.3)
+  const owner = isTicketOwner(ticket, user);
+  const canEdit = canEditTicket(ticket, user);
   const canChat = canChatOnTicket(ticket, user);
+  const isRequester = ticketRequesterId(ticket) === user.id;
+
   const author = db.byId('users', ticket.createdBy);
   const assignee = ticket.assignedTo ? db.byId('users', ticket.assignedTo) : null;
   const cat = ticket.categoryId ? db.byId('categories', ticket.categoryId) : null;
@@ -44,15 +49,28 @@ export default function TicketDetail() {
         <span className="muted small">#{ticket.id.slice(-6)}</span>
       </div>
 
-      {ticket.urgentAlert && (
+      {/* faixas de estado */}
+      {closed && (
+        <div className="alert" style={{ background: '#E8F0E6', border: '1px solid #C6DBC2', color: '#3B6B44' }}>
+          ✅ <b>Chamado concluído e encerrado.</b> O chat e todas as edições estão bloqueados.
+        </div>
+      )}
+      {!closed && ticket.urgentAlert && (
         <div className="alert" style={{ background: 'var(--danger-soft)', border: '1px solid #E8CFC8', color: '#8F3121' }}>
           🚨 <b>Alerta de urgência</b> enviado pelo solicitante — este chamado precisa de atenção imediata.
         </div>
       )}
-      {ticket.status === 'em_analise' && (
-        <div className="alert alert-info">
-          🔎 Em análise — aguardando o solicitante <b>{requesterLabel}</b> confirmar se foi resolvido.
-        </div>
+      {!closed && ticket.status === 'em_analise' && (
+        isRequester ? (
+          <div className="alert" style={{ background: '#EFE9F7', border: '1px solid #D6CCEA', color: '#4E4482' }}>
+            🔎 <b>Aguardando a sua análise.</b> O time marcou este chamado como resolvido —
+            confirme abaixo se está tudo certo ou rejeite para devolvê-lo.
+          </div>
+        ) : (
+          <div className="alert alert-info">
+            🔎 Em análise — aguardando o solicitante <b>{requesterLabel}</b> confirmar se foi resolvido.
+          </div>
+        )
       )}
 
       <div className="grid grid-sidebar" style={{ alignItems: 'start' }}>
@@ -78,28 +96,29 @@ export default function TicketDetail() {
             <RichView html={ticket.description} />
           </div>
 
-          <TicketChat ticket={ticket} user={user} onPost={bump} canChat={canChat} key={tick} />
+          <TicketChat ticket={ticket} user={user} onPost={bump} canChat={canChat} closed={closed} key={tick} />
 
-          {tech && <Attendances ticket={ticket} user={user} onAdd={bump} canRegister={owner} />}
+          {tech && <Attendances ticket={ticket} user={user} onAdd={bump} canRegister={canEdit} closed={closed} />}
         </div>
 
-        {/* ---------- coluna lateral (ações) ---------- */}
+        {/* ---------- coluna lateral ---------- */}
         <div className="col" style={{ gap: 16 }}>
-          {/* Ações do solicitante autor: alerta + análise (RCS05 / RCS08) */}
-          {isAuthor && user.role === 'solicitante' && (
+          {/* ações do solicitante */}
+          {isRequester && user.role === 'solicitante' && !closed && (
             <div className="card card-pad">
               <h3>Ações do solicitante</h3>
               {ticket.status === 'em_analise' ? (
                 <>
-                  <p className="muted small">O time marcou como resolvido. Confere se está tudo certo?</p>
+                  <p className="muted small">Confira se o problema foi realmente resolvido.</p>
                   <div className="col" style={{ gap: 6 }}>
                     <button className="btn-primary btn-sm" style={{ justifyContent: 'center' }}
-                      onClick={() => { approveReview(ticket.id, user); bump(); }}>👍 Aprovar (concluir)</button>
+                      onClick={() => { approveReview(ticket.id, user); bump(); }}>👍 Aprovar e concluir</button>
                     <button className="btn-sm btn-danger" style={{ justifyContent: 'center' }}
                       onClick={() => { rejectReview(ticket.id, user); bump(); }}>👎 Rejeitar (voltar ao time)</button>
                   </div>
+                  <p className="hint">Ao aprovar, o chamado é <b>encerrado</b> — o chat e as edições são bloqueados.</p>
                 </>
-              ) : ticket.status !== 'concluido' ? (
+              ) : (
                 <button
                   className={ticket.urgentAlert ? 'btn-sm btn-danger' : 'btn-sm'}
                   style={{ width: '100%', justifyContent: 'center' }}
@@ -107,8 +126,6 @@ export default function TicketDetail() {
                 >
                   {ticket.urgentAlert ? '🔕 Cancelar alerta de urgência' : '🚨 Enviar alerta de urgência'}
                 </button>
-              ) : (
-                <p className="muted small" style={{ margin: 0 }}>Chamado concluído.</p>
               )}
             </div>
           )}
@@ -127,7 +144,7 @@ export default function TicketDetail() {
               <p className="muted small" style={{ margin: 0 }}>Ninguém atribuído.</p>
             )}
 
-            {isSuporte && (
+            {isSuporte && !closed && (
               <div className="field" style={{ marginTop: 12, marginBottom: 0 }}>
                 <label>Atribuir para</label>
                 <select value={ticket.assignedTo || ''} onChange={(e) => { assignTicket(ticket.id, e.target.value || null, user); bump(); }}>
@@ -138,7 +155,7 @@ export default function TicketDetail() {
                 </select>
               </div>
             )}
-            {user.role === 'dev' && ticket.assignedTo !== user.id && (
+            {user.role === 'dev' && !closed && ticket.assignedTo !== user.id && (
               <button className="btn-primary btn-sm mt" style={{ width: '100%', justifyContent: 'center' }}
                 onClick={() => { assignTicket(ticket.id, user.id, user); bump(); }}>
                 Pegar este chamado
@@ -146,18 +163,16 @@ export default function TicketDetail() {
             )}
           </div>
 
-          {/* Status/urgência: só o responsável pelo ticket */}
-          {tech && owner && (
+          {/* status/urgência — só o responsável e só se não encerrado */}
+          {tech && canEdit && (
             <div className="card card-pad">
               <h3>Status</h3>
               <div className="col" style={{ gap: 6 }}>
                 {MANUAL_STATUS.map((k) => (
-                  <button
-                    key={k}
+                  <button key={k}
                     className={ticket.status === k ? 'btn-primary btn-sm' : 'btn-sm'}
                     style={{ justifyContent: 'flex-start' }}
-                    onClick={() => { setStatus(ticket.id, k, user); bump(); }}
-                  >
+                    onClick={() => { setStatus(ticket.id, k, user); bump(); }}>
                     <span className="dot" style={{ background: STATUS[k].color }} /> {STATUS[k].label}
                   </button>
                 ))}
@@ -169,25 +184,34 @@ export default function TicketDetail() {
                   🔎 Enviar para análise do solicitante
                 </button>
               )}
-              {ticket.status === 'em_analise' && (
-                <p className="muted small mt">Aguardando aprovação do solicitante.</p>
-              )}
+              {ticket.status === 'em_analise' && <p className="muted small mt">Aguardando aprovação do solicitante.</p>}
 
               <div className="field" style={{ marginTop: 14, marginBottom: 0 }}>
                 <label>Urgência</label>
                 <select value={ticket.urgency} onChange={(e) => { setUrgency(ticket.id, e.target.value, user); bump(); }}>
-                  {Object.entries(URGENCY).map(([k, v]) => (
-                    <option key={k} value={k}>{v.label}</option>
-                  ))}
+                  {Object.entries(URGENCY).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
               </div>
             </div>
           )}
-          {tech && !owner && (
+
+          {tech && !canEdit && !closed && (
             <div className="card card-pad">
               <p className="muted small" style={{ margin: 0 }}>
                 🔒 Alterar status, urgência e registrar atendimentos é liberado apenas para o <b>responsável</b> pelo chamado.
               </p>
+            </div>
+          )}
+
+          {/* saída de emergência: só o suporte pode reabrir um chamado encerrado */}
+          {closed && isSuporte && (
+            <div className="card card-pad">
+              <h3>Chamado encerrado</h3>
+              <p className="muted small">Precisa retomar o atendimento? Só o suporte pode reabrir.</p>
+              <button className="btn-sm" style={{ width: '100%', justifyContent: 'center' }}
+                onClick={() => { reopenTicket(ticket.id, user); bump(); }}>
+                ↩️ Reabrir chamado
+              </button>
             </div>
           )}
         </div>
@@ -197,9 +221,9 @@ export default function TicketDetail() {
 }
 
 // -------------------------------------------------------------
-//  Chat do chamado (RCS03) — escrita só p/ responsável e solicitante
+//  Chat do chamado — bloqueado quando encerrado
 // -------------------------------------------------------------
-function TicketChat({ ticket, user, onPost, canChat }) {
+function TicketChat({ ticket, user, onPost, canChat, closed }) {
   const [text, setText] = useState('');
   const logRef = useRef(null);
   const messages = ticketMessages(ticket.id);
@@ -219,10 +243,10 @@ function TicketChat({ ticket, user, onPost, canChat }) {
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', height: 420 }}>
       <div className="card-pad" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
-        <h3 style={{ margin: 0 }}>💬 Conversa do chamado</h3>
+        <h3 style={{ margin: 0 }}>💬 Conversa do chamado {closed && <span className="chip">encerrada</span>}</h3>
       </div>
       <div className="chat-log" ref={logRef}>
-        {messages.length === 0 && <p className="muted small" style={{ textAlign: 'center' }}>Nenhuma mensagem ainda.</p>}
+        {messages.length === 0 && <p className="muted small" style={{ textAlign: 'center' }}>Nenhuma mensagem.</p>}
         {messages.map((m) => {
           const u = db.byId('users', m.userId);
           const mine = m.userId === user.id;
@@ -242,7 +266,11 @@ function TicketChat({ ticket, user, onPost, canChat }) {
         </form>
       ) : (
         <div className="chat-input" style={{ justifyContent: 'center' }}>
-          <span className="muted small">🔒 Apenas o responsável pelo chamado e o solicitante podem enviar mensagens.</span>
+          <span className="muted small">
+            {closed
+              ? '🔒 Chamado encerrado — a conversa foi finalizada.'
+              : '🔒 Apenas o responsável pelo chamado e o solicitante podem enviar mensagens.'}
+          </span>
         </div>
       )}
     </div>
@@ -250,9 +278,9 @@ function TicketChat({ ticket, user, onPost, canChat }) {
 }
 
 // -------------------------------------------------------------
-//  Atendimentos (registro de trabalho feito) — só o responsável registra
+//  Atendimentos do chamado — só o responsável registra
 // -------------------------------------------------------------
-function Attendances({ ticket, user, onAdd, canRegister }) {
+function Attendances({ ticket, user, onAdd, canRegister, closed }) {
   const [note, setNote] = useState('');
   const add = (e) => {
     e.preventDefault();
@@ -282,7 +310,9 @@ function Attendances({ ticket, user, onAdd, canRegister }) {
           <button className="btn-primary btn-sm">Registrar</button>
         </form>
       ) : (
-        <p className="muted small mt" style={{ margin: '10px 0 0' }}>🔒 Só o responsável pelo chamado pode registrar atendimentos.</p>
+        <p className="muted small mt" style={{ margin: '10px 0 0' }}>
+          {closed ? '🔒 Chamado encerrado.' : '🔒 Só o responsável pelo chamado pode registrar atendimentos.'}
+        </p>
       )}
     </div>
   );

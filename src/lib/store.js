@@ -19,7 +19,10 @@ const COLLECTIONS = [
   'internalMessages',
   'services',      // RCS04/07 — templates de criação de tickets
   'invitations',   // RP02/RP06 — convites com aceite/recusa
+  'clients',       // cadastro de clientes (usado no registro de atendimentos)
   'attendances',   // RCS12 — registro de atendimentos avulsos
+  'notifications', // avisos por usuário (mensagens, status, análise…)
+  'chatReads',     // marcador de leitura por canal do chat interno
   'auditLog',      // RP16 — log de auditoria por grupo
 ];
 

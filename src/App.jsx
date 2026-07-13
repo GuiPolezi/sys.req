@@ -18,6 +18,7 @@ import Team from './pages/Team';
 import Invites from './pages/Invites';
 import InternalChat from './pages/InternalChat';
 import Profile from './pages/Profile';
+import Notifications from './pages/Notifications';
 import Attendances from './pages/Attendances';
 import Ranking from './pages/Ranking';
 import Audit from './pages/Audit';
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="/tickets/new" element={<NewTicket />} />
         <Route path="/tickets/:id" element={<TicketDetail />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/notifications" element={<Notifications />} />
         <Route path="/groups" element={<Groups />} />
         {tech && <Route path="/pool" element={<Pool />} />}
         {tech && <Route path="/assigned" element={<Assigned />} />}

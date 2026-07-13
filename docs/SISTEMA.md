@@ -1,4 +1,4 @@
-# HelpDesk — Documentação do Sistema (v0.0.2)
+# HelpDesk — Documentação do Sistema (v0.0.3)
 
 Documento único que explica **tudo o que foi desenvolvido até agora**: propósito, arquitetura,
 modelo de dados, funcionalidades, regras de negócio, telas, design e limitações.
@@ -135,12 +135,15 @@ Como o `localStorage` não é reativo, o `AuthContext` expõe um contador (`tick
 | `groups` | Grupos + membros embutidos | `id, name, description, ownerId, members[], techInviteCode, requesterCode` |
 | `categories` | **Categorias de desenvolvedor** (Web, Desktop, Infra…) | `id, groupId, name, systems[], color` |
 | `systems` | **Sistemas do grupo** (selecionáveis no chamado) | `id, groupId, name, categoryId` |
-| `services` | **Modelos** que padronizam a criação de chamados | `id, groupId, name, ticketType, defaultTitle, categoryId, assignTo, urgency` |
+| `services` | **Modelos** que padronizam a criação de chamados; pertencem a um sistema | `id, groupId, name, systemId, ticketType, defaultTitle, categoryId, assignMode, assignTo, assignCategoryId, urgency` |
 | `tickets` | Chamados | ver abaixo |
 | `ticketMessages` | Chat de cada chamado | `id, ticketId, userId, text, at` |
 | `internalMessages` | Chat interno dos técnicos, **por canal** | `id, groupId, channel, userId, text, at` |
 | `invitations` | Convites com aceite/recusa | `id, groupId, inviteeId, role, status, createdBy` |
-| `attendances` | Atendimentos (avulsos e os do chamado) | `id, groupId, userId, ticketId?, cidade, client, note, at` |
+| `clients` | **Clientes** cadastrados (usados no registro de atendimentos) | `id, groupId, name, cidade, contact, note` |
+| `attendances` | Atendimentos (avulsos e os do chamado) | `id, groupId, userId, ticketId?, clientId?, client, cidade, note, at` |
+| `notifications` | **Avisos por usuário** (mensagem, status, análise, atribuição…) | `id, groupId, userId, type, ticketId, text, at, read` |
+| `chatReads` | Marcador de leitura por canal do chat interno | `id, groupId, userId, channel, at` |
 | `auditLog` | Log de auditoria do grupo | `id, groupId, userId, action, detail, at` |
 
 **Membro do grupo** (`groups.members[]`): `{ userId, role, categoryIds[], joinedAt }` — é aqui que
@@ -174,8 +177,11 @@ serviceId, cidade, attendances[], createdAt, updatedAt
 
 ### 6.1 Chamados (tickets)
 
-**Abertura em 2 passos:** primeiro o usuário escolhe um **Serviço** (modelo) ou **Chamado avulso**;
-só depois aparece o formulário — já pré-preenchido pelo serviço quando aplicável.
+**Abertura em 3 passos (v0.0.3):**
+
+1. **Sistema afetado** — o usuário escolhe qual sistema está com problema (ou "Não sei / outro").
+2. **Serviço** — aparecem apenas os serviços **daquele sistema**, mais a opção "Chamado avulso".
+3. **Formulário** — já pré-preenchido pelo sistema e pelo serviço escolhidos.
 
 O formulário tem:
 - **Descrição rica** — editor próprio com negrito, itálico, sublinhado, título, citação, listas e
@@ -199,6 +205,10 @@ aberto → em_andamento → (aguardando) → em_analise → concluido
 - O solicitante então **aprova** (vira `concluido`) ou **rejeita** (volta para `em_andamento`).
 - O solicitante pode ligar/desligar um **alerta de urgência** (🚨), que destaca o chamado.
 
+> **Encerramento (v0.0.3):** um chamado `concluido` fica **encerrado** — o chat é fechado e
+> **nenhuma edição** é possível (status, urgência, atendimentos). Como saída de emergência,
+> apenas o **suporte** pode **reabrir** um chamado encerrado.
+
 **Visibilidade — quem vê o quê:**
 
 | Papel | Vê |
@@ -214,18 +224,31 @@ aberto → em_andamento → (aguardando) → em_analise → concluido
 
 ### 6.2 Serviços (modelos de chamado)
 
-Um serviço padroniza a abertura: define **tipo, título padrão (prefixo), categoria, urgência e
-atribuição automática**. Pode-se ter vários serviços para o mesmo assunto (ex.: "Erro em site",
-"Melhoria no site", "Ajuste de configuração"). Ao escolher o serviço, o formulário já vem pronto —
-e o chamado pode ir direto para o dev correto.
+Um serviço padroniza a abertura: define **sistema, tipo, título padrão (prefixo), categoria,
+urgência e atribuição automática**. Cada sistema pode ter **vários serviços** (ex.: para o Site →
+"Erro no site", "Melhoria no site", "Ajuste de configuração"), e é assim que eles aparecem na
+abertura do chamado.
+
+**Atribuição automática (v0.0.3)** — três modos:
+
+| Modo | O que faz |
+|------|-----------|
+| **Nenhuma** | O chamado nasce sem responsável e cai no pool de não atribuídos. |
+| **Técnico fixo** | Sempre vai para a mesma pessoa. |
+| **Por categoria** | **Distribui automaticamente** para o **desenvolvedor daquela categoria que estiver com menos chamados ativos** — balanceamento de carga, sem precisar escolher a pessoa. |
 
 ### 6.3 Categorias e Sistemas
 
 - **Categorias** = áreas de atuação do desenvolvedor (Desenvolvimento Web, Desktop, Infraestrutura).
   Classificam o chamado e definem o que cada dev atende. O suporte cria; o **dev escolhe as suas**
-  no próprio perfil, e o suporte também pode atribuí-las.
+  no próprio perfil, e o suporte também pode atribuí-las. A tela de categorias **lista os sistemas
+  vinculados** a cada uma (não é mais um campo digitável).
 - **Sistemas** = os sistemas atendidos pelo grupo (Siscam 9, Siave, Site…). São selecionados no
-  chamado para **identificar o que está com problema**. Podem ser vinculados a uma categoria.
+  chamado para **identificar o que está com problema**, agrupam os **serviços** e podem ser
+  vinculados a uma categoria.
+
+> Categorias, sistemas, serviços e clientes podem ser **criados, editados e excluídos**, sempre com
+> **modal de confirmação** na exclusão, informando o que será afetado.
 
 ### 6.4 Comunicação
 
@@ -238,10 +261,35 @@ e o chamado pode ir direto para o dev correto.
 Página **exclusiva do suporte** para registrar atendimentos feitos **fora de um chamado**
 (visita, telefone, presencial). Ex.: "atendi o cliente em Itajubá".
 
-Foi desenhada para uso intenso no dia a dia:
-- **Mini calendário** do mês com a **contagem de atendimentos em cada dia**.
-- **Navegação por dia** (‹ hoje ›) e lista limpa do dia selecionado.
-- **Formulário em modal**, aberto por botão (cliente/local, cidade, o que foi feito).
+Organizada em **3 abas**:
+
+- **📅 Agenda** — mini calendário do mês com a **contagem de atendimentos em cada dia**, navegação
+  por dia (‹ hoje ›) e a lista do dia selecionado.
+- **📊 Por técnico** — gráfico de colunas com **quantos atendimentos cada técnico fez** no dia
+  escolhido e no **total acumulado**.
+- **👥 Clientes** — **cadastro de clientes** (nome, cidade, contato, observações), com busca.
+
+O registro é feito em **modal**: basta **selecionar um cliente cadastrado** (que já traz cidade e
+contato) e descrever o que foi feito — ou **digitar nome e cidade manualmente**, quando o cliente
+ainda não existe. Isso torna o registro muito mais rápido no dia a dia.
+
+### 6.5.1 Notificações (v0.0.3)
+
+Todo usuário tem uma página **🔔 Notificações** (com badge de não lidas na barra lateral). São
+geradas automaticamente quando:
+
+| Evento | Quem é avisado |
+|--------|----------------|
+| Nova **mensagem** no chat do chamado | a outra parte (solicitante ↔ responsável) |
+| **Status** alterado | solicitante e responsável |
+| Chamado **enviado para análise** | o **solicitante** (com destaque também no Painel) |
+| Chamado **atribuído** | o técnico responsável |
+| **Alerta de urgência** ligado | o responsável |
+| Solicitante **aprovou / rejeitou** | o responsável |
+
+Além disso, a barra lateral mostra contadores ao vivo de **chat interno não lido** (por canal também)
+e da **fila de não atribuídos**. Para o solicitante, o Painel exibe um **aviso destacado** quando há
+chamados aguardando a análise dele.
 
 ### 6.6 Painel (dashboard)
 
@@ -252,6 +300,8 @@ Visão analítica, sempre respeitando o que o papel pode ver:
   temporal — colunas só funcionam bem com poucos períodos discretos.)*
 - **Rosca (donut)** por status, com legenda.
 - **Barras** por urgência e por categoria.
+- **👥 Carga da equipe** *(só técnicos)* — gráfico de colunas com os **chamados ativos atribuídos por
+  técnico**. É o painel privado da equipe: mostra na hora quem está sobrecarregado.
 - **Atividade recente** — os 8 chamados mais recentes, em **ordem decrescente de criação**.
 
 ### 6.7 Relatórios e governança
@@ -282,10 +332,11 @@ O perfil muda conforme o papel:
 | `/tickets` | Lista de chamados | todos |
 | `/tickets/new` | Abrir chamado (2 passos) | todos |
 | `/tickets/:id` | Detalhe do chamado | quem pode ver o chamado |
+| `/notifications` | Notificações | todos |
 | `/assigned` | Atribuídos a mim | técnicos |
 | `/pool` | Não atribuídos | técnicos |
 | `/chat` | Chat interno (canais) | técnicos |
-| `/team` | Membros (abas Técnicos / Solicitantes) + convites + config. do grupo | técnicos |
+| `/team` | Equipe — abas **Técnicos**, **Solicitantes** e **⚙️ Configurações** | técnicos |
 | `/invites` | Convites recebidos (aceitar/recusar) | técnicos |
 | `/attendances` | Registro de atendimentos | **suporte** |
 | `/categories` | Categorias de desenvolvedor | **suporte** |
@@ -332,6 +383,15 @@ Assim o menu **nunca faz a página rolar**, mesmo em telas baixas. Há ainda um 
 | **v0.0.2 — design** | Reformulação visual completa (paleta, tipografia, componentes) + responsividade. |
 | **v0.0.2 — rodada de testes 1** | Página de grupos; cidade só para solicitante; ranking com pódio e só solicitantes; atendimentos com calendário; membros em abas; chat com canais; abertura de chamado em 2 passos; editor rico; sistemas do grupo; atribuição de técnico; "atribuídos a mim"; permissões por responsável; chamado em nome de terceiros; stats do solicitante; dev sem acesso a atendimentos. |
 | **v0.0.2 — rodada de testes 2** | Dashboard profissional com gráficos; atividade recente por criação; cidade vazia no registro de atendimento; gráfico de área com filtro de período; redesenho do menu lateral e revisão da responsividade. |
+| **v0.0.3 — testes de produção** | **3 bugs corrigidos** (cadastro atômico, editor de texto invertido, texto vazando dos cards). Edição + confirmação de exclusão em categorias/sistemas/serviços; categoria lista seus sistemas; serviços por sistema com **atribuição balanceada por categoria**; abertura de chamado em 3 passos; aba **Configurações** na Equipe; **cadastro de clientes** e **atendimentos por técnico**; **notificações** com badges; **carga da equipe** no painel; contagem no pool; **encerramento** do chamado concluído (com reabertura pelo suporte). |
+
+### Bugs corrigidos na v0.0.3
+
+| Bug | Causa | Correção |
+|-----|-------|----------|
+| Solicitante era **criado mesmo sem código válido** | O usuário era gravado **antes** de validar o código do grupo | Novo `registerUser()` **atômico**: valida o código (e se é o código certo) **antes** de gravar qualquer coisa |
+| Descrição do chamado **saía ao contrário** | O `contentEditable` era re-renderizado com `dangerouslySetInnerHTML` a cada tecla; o React reescrevia o `innerHTML` e o cursor voltava ao início | O editor passou a ser **não-controlado**: o DOM só é escrito quando o conteúdo realmente difere |
+| **Texto vazando** do card do chamado | Nomes longos (categoria/sistema) sem tratamento de overflow em containers flex | `min-width: 0`, quebra de palavra nos textos e `ellipsis` nos chips; botões não encolhem |
 
 ---
 
@@ -343,6 +403,8 @@ Assim o menu **nunca faz a página rolar**, mesmo em telas baixas. Há ainda um 
 - **Imagens no editor viram data URL** dentro do ticket — funciona para validar, mas num backend
   real devem ir para um storage de arquivos.
 - **Sem paginação** — listas carregam tudo; com centenas de milhares de registros seria necessário paginar.
+
+- **Notificações não são push** — aparecem ao navegar (não há servidor para empurrá-las em tempo real).
 
 ### Backlog (levantado nos testes, ainda não implementado)
 - **Foto de perfil** dos usuários.

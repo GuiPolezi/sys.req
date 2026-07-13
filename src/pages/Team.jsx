@@ -3,27 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   groupMembers, categoriesForGroup, updateMemberCategories, regenerateCode,
-  createInvitation, invitationsForGroup, updateGroup,
-  leaveGroup, deleteGroup,
+  createInvitation, invitationsForGroup, updateGroup, leaveGroup, deleteGroup,
 } from '../lib/domain';
-import { RoleBadge, Avatar, Modal } from '../components/ui';
+import { RoleBadge, Avatar, Modal, ConfirmModal, Empty } from '../components/ui';
 
 export default function Team() {
   const { user, activeGroup, refresh, selectGroup, groups } = useAuth();
   const navigate = useNavigate();
   const [, setLocal] = useState(0);
+  const [tab, setTab] = useState('tecnicos');
+  const [q, setQ] = useState('');
   const bump = () => { refresh(); setLocal((n) => n + 1); };
 
   const isSuporte = user.role === 'suporte';
-  const isOwner = activeGroup.ownerId === user.id;
   const members = groupMembers(activeGroup);
   const categories = categoriesForGroup(activeGroup.id);
   const tecnicos = members.filter((m) => m.role !== 'solicitante');
   const solicitantes = members.filter((m) => m.role === 'solicitante');
-  const [tab, setTab] = useState('tecnicos');
-  const [q, setQ] = useState('');
-
-  const copy = (code) => { navigator.clipboard?.writeText(code); };
 
   const toggleCat = (userId, catId, current) => {
     const next = current.includes(catId) ? current.filter((c) => c !== catId) : [...current, catId];
@@ -38,44 +34,32 @@ export default function Team() {
     navigate('/');
   };
 
-  const doLeave = () => {
-    if (!confirm('Deseja realmente sair deste grupo? Você perderá o acesso às informações dele.')) return;
-    try { leaveGroup(activeGroup.id, user); afterExit(); }
-    catch (err) { alert(err.message); }
-  };
-
   return (
     <div>
-      <div className="row between page-head">
-        <div>
-          <h1>Membros{isSuporte ? ' & convites' : ''}</h1>
-          <p className="muted">{activeGroup.description || 'Integrantes do grupo de trabalho.'}</p>
-        </div>
-        {!isSuporte && (
-          <button className="btn-danger" onClick={doLeave}>🚪 Sair do grupo</button>
-        )}
+      <div className="page-head">
+        <h1>Equipe</h1>
+        <p className="muted">{activeGroup.description || 'Integrantes e configurações do grupo.'}</p>
       </div>
 
-      {isSuporte && <SuporteAdmin group={activeGroup} user={user} bump={bump} copy={copy}
-        isOwner={isOwner} onDeleted={afterExit} onLeft={doLeave} />}
-
-      {/* ---- membros em abas: Técnicos x Solicitantes (RP05) ---- */}
-      <div className="auth-tabs" style={{ maxWidth: 420 }}>
+      <div className="auth-tabs" style={{ maxWidth: 560 }}>
         <button className={tab === 'tecnicos' ? 'btn-primary' : ''} onClick={() => setTab('tecnicos')}>
           Técnicos ({tecnicos.length})
         </button>
         <button className={tab === 'solicitantes' ? 'btn-primary' : ''} onClick={() => setTab('solicitantes')}>
           Solicitantes ({solicitantes.length})
         </button>
+        <button className={tab === 'config' ? 'btn-primary' : ''} onClick={() => setTab('config')}>
+          ⚙️ Configurações
+        </button>
       </div>
 
-      {tab === 'tecnicos' ? (
+      {tab === 'tecnicos' && (
         <div className="card">
           {tecnicos.map((m) => (
             <div key={m.userId} className="ticket-row" style={{ cursor: 'default', alignItems: 'flex-start' }}>
               <Avatar name={m.user.name} />
               <div style={{ flex: 1 }}>
-                <div className="row" style={{ gap: 8 }}>
+                <div className="row wrap" style={{ gap: 8 }}>
                   <b>{m.user.name}</b>
                   <RoleBadge role={m.role} />
                   {m.userId === activeGroup.ownerId && <span className="chip">dono</span>}
@@ -105,13 +89,15 @@ export default function Team() {
             </div>
           ))}
         </div>
-      ) : (
+      )}
+
+      {tab === 'solicitantes' && (
         <div>
           <div className="card card-pad mb">
             <input placeholder="🔍 Buscar solicitante por nome ou cidade..." value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
           <div className="card">
-            {solicitantes.length === 0 && <div className="empty">Nenhum solicitante no grupo ainda.</div>}
+            {solicitantes.length === 0 && <Empty>Nenhum solicitante no grupo ainda.</Empty>}
             {solicitantes
               .filter((m) => {
                 const s = q.trim().toLowerCase();
@@ -131,14 +117,19 @@ export default function Team() {
           </div>
         </div>
       )}
+
+      {tab === 'config' && (
+        <Settings group={activeGroup} user={user} isSuporte={isSuporte} bump={bump} onExit={afterExit} />
+      )}
     </div>
   );
 }
 
 // -------------------------------------------------------------
-//  Bloco de administração — só suporte
+//  Aba de Configurações do grupo (v0.0.3)
 // -------------------------------------------------------------
-function SuporteAdmin({ group, user, bump, copy, isOwner, onDeleted, onLeft }) {
+function Settings({ group, user, isSuporte, bump, onExit }) {
+  const isOwner = group.ownerId === user.id;
   const [inviteLogin, setInviteLogin] = useState('');
   const [inviteMsg, setInviteMsg] = useState('');
   const [editOpen, setEditOpen] = useState(false);
@@ -146,16 +137,19 @@ function SuporteAdmin({ group, user, bump, copy, isOwner, onDeleted, onLeft }) {
   const [gDesc, setGDesc] = useState(group.description || '');
   const [delOpen, setDelOpen] = useState(false);
   const [delStep, setDelStep] = useState(0);
+  const [leaveOpen, setLeaveOpen] = useState(false);
 
-  const pending = invitationsForGroup(group.id).filter((i) => i.status === 'pendente');
+  const invites = invitationsForGroup(group.id);
+  const pending = invites.filter((i) => i.status === 'pendente');
+  const copy = (code) => navigator.clipboard?.writeText(code);
 
   const sendInvite = (e) => {
     e.preventDefault();
     setInviteMsg('');
     try {
-      const u = createInvitation(group.id, inviteLogin, user);
+      const inv = createInvitation(group.id, inviteLogin, user);
       setInviteLogin('');
-      setInviteMsg(`Convite enviado (${u.inviteeLogin}).`);
+      setInviteMsg(`✅ Convite enviado para ${inv.inviteeLogin}.`);
       bump();
     } catch (err) { setInviteMsg(err.message); }
   };
@@ -165,67 +159,109 @@ function SuporteAdmin({ group, user, bump, copy, isOwner, onDeleted, onLeft }) {
     setEditOpen(false); bump();
   };
 
-  const confirmDelete = () => {
-    deleteGroup(group.id, user);
-    onDeleted();
+  const doLeave = () => {
+    try { leaveGroup(group.id, user); onExit(); }
+    catch (err) { alert(err.message); }
   };
 
-  return (
-    <>
-      {/* códigos de convite */}
-      <div className="grid grid-2 mb">
-        <div className="card card-pad">
-          <h3>👨‍💻 Convite de técnicos</h3>
-          <p className="muted small">Para suporte/devs entrarem no grupo.</p>
-          <div className="row" style={{ gap: 8 }}>
-            <span className="code-box">{group.techInviteCode}</span>
-            <button className="btn-sm" onClick={() => copy(group.techInviteCode)}>Copiar</button>
-            <button className="btn-sm" onClick={() => { regenerateCode(group.id, 'tech', user); bump(); }}>↺</button>
+  // Técnicos não-suporte só veem informações e a opção de sair
+  if (!isSuporte) {
+    return (
+      <>
+        <div className="card card-pad mb">
+          <h3>Sobre o grupo</h3>
+          <div className="grid grid-2 mt">
+            <div><div className="muted small">Nome</div><div>{group.name}</div></div>
+            <div><div className="muted small">Descrição</div><div>{group.description || '—'}</div></div>
           </div>
         </div>
         <div className="card card-pad">
-          <h3>🙋 Cadastro de solicitantes</h3>
-          <p className="muted small">Solicitantes usam este código ao criar a conta (RC05).</p>
-          <div className="row" style={{ gap: 8 }}>
+          <h3>⚠️ Zona de perigo</h3>
+          <p className="muted small">Ao sair, você perde o acesso a todo o conteúdo deste grupo.</p>
+          <button className="btn-danger" onClick={() => setLeaveOpen(true)}>🚪 Sair do grupo</button>
+        </div>
+        {leaveOpen && (
+          <ConfirmModal
+            title="Sair do grupo" danger confirmLabel="Sair do grupo"
+            message={<>Deseja sair de <b>{group.name}</b>? Seus chamados atribuídos ficarão sem responsável.</>}
+            onCancel={() => setLeaveOpen(false)} onConfirm={doLeave}
+          />
+        )}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {/* dados do grupo */}
+      <div className="card card-pad mb">
+        <div className="row between">
+          <h3 style={{ margin: 0 }}>📋 Dados do grupo</h3>
+          <button className="btn-sm" onClick={() => setEditOpen(true)}>✏️ Editar</button>
+        </div>
+        <div className="grid grid-2 mt">
+          <div><div className="muted small">Nome</div><div>{group.name}</div></div>
+          <div><div className="muted small">Descrição</div><div>{group.description || '—'}</div></div>
+        </div>
+      </div>
+
+      {/* códigos de acesso */}
+      <div className="grid grid-2 mb">
+        <div className="card card-pad">
+          <h3>👨‍💻 Código de técnicos</h3>
+          <p className="muted small">Suporte e devs entram no grupo com este código.</p>
+          <div className="row wrap" style={{ gap: 8 }}>
+            <span className="code-box">{group.techInviteCode}</span>
+            <button className="btn-sm" onClick={() => copy(group.techInviteCode)}>Copiar</button>
+            <button className="btn-sm" title="Gerar novo" onClick={() => { regenerateCode(group.id, 'tech', user); bump(); }}>↺</button>
+          </div>
+        </div>
+        <div className="card card-pad">
+          <h3>🙋 Código de solicitantes</h3>
+          <p className="muted small">Obrigatório no cadastro do solicitante — sem ele, a conta não é criada.</p>
+          <div className="row wrap" style={{ gap: 8 }}>
             <span className="code-box">{group.requesterCode}</span>
             <button className="btn-sm" onClick={() => copy(group.requesterCode)}>Copiar</button>
-            <button className="btn-sm" onClick={() => { regenerateCode(group.id, 'requester', user); bump(); }}>↺</button>
+            <button className="btn-sm" title="Gerar novo" onClick={() => { regenerateCode(group.id, 'requester', user); bump(); }}>↺</button>
           </div>
         </div>
       </div>
 
-      {/* convidar por login (RP02) */}
+      {/* convites */}
       <div className="card card-pad mb">
-        <h3>✉️ Convidar técnico por usuário</h3>
-        <p className="muted small">Envia um convite que o suporte/dev aceita ou recusa (RP06).</p>
+        <h3>✉️ Convidar técnico</h3>
+        <p className="muted small">O convidado aceita ou recusa na página de Convites.</p>
         {inviteMsg && <div className="alert alert-info">{inviteMsg}</div>}
-        <form className="row" onSubmit={sendInvite} style={{ gap: 8 }}>
-          <input value={inviteLogin} onChange={(e) => setInviteLogin(e.target.value)} placeholder="login ou e-mail do técnico" />
+        <form className="row wrap" onSubmit={sendInvite} style={{ gap: 8 }}>
+          <input value={inviteLogin} onChange={(e) => setInviteLogin(e.target.value)}
+            placeholder="login ou e-mail do técnico" style={{ flex: 1, minWidth: 200 }} />
           <button className="btn-primary">Convidar</button>
         </form>
-        {pending.length > 0 && (
+
+        {invites.length > 0 && (
           <div className="mt">
-            <div className="muted small mb">Convites pendentes:</div>
+            <div className="muted small mb">Convites ({pending.length} pendente(s)):</div>
             <div className="row wrap" style={{ gap: 6 }}>
-              {pending.map((i) => (
-                <span key={i.id} className="chip">{i.invitee?.name || i.inviteeLogin} · aguardando</span>
+              {invites.slice(0, 12).map((i) => (
+                <span key={i.id} className="chip">
+                  {i.invitee?.name || i.inviteeLogin} · {i.status}
+                </span>
               ))}
             </div>
           </div>
         )}
       </div>
 
-      {/* configurações do grupo (RP09 / RP13) */}
-      <div className="card card-pad mb">
-        <div className="row between">
-          <div>
-            <h3>⚙️ Configurações do grupo</h3>
-            <p className="muted small" style={{ margin: 0 }}>Nome e descrição do grupo.</p>
-          </div>
+      {/* zona de perigo */}
+      <div className="card card-pad" style={{ borderColor: '#E8CFC8' }}>
+        <h3>⚠️ Zona de perigo</h3>
+        <div className="row wrap between" style={{ gap: 10 }}>
+          <p className="muted small" style={{ margin: 0, flex: 1, minWidth: 220 }}>
+            Apagar o grupo remove <b>permanentemente</b> chamados, categorias, sistemas, serviços, clientes, chats e registros.
+          </p>
           <div className="row" style={{ gap: 8 }}>
-            <button className="btn-sm" onClick={() => setEditOpen(true)}>✏️ Editar</button>
-            {!isOwner && <button className="btn-sm btn-danger" onClick={onLeft}>🚪 Sair</button>}
-            <button className="btn-sm btn-danger" onClick={() => { setDelStep(0); setDelOpen(true); }}>🗑️ Apagar grupo</button>
+            {!isOwner && <button className="btn-danger" onClick={() => setLeaveOpen(true)}>🚪 Sair</button>}
+            <button className="btn-danger" onClick={() => { setDelStep(0); setDelOpen(true); }}>🗑️ Apagar grupo</button>
           </div>
         </div>
       </div>
@@ -237,11 +273,18 @@ function SuporteAdmin({ group, user, bump, copy, isOwner, onDeleted, onLeft }) {
             <button className="btn-primary" onClick={saveGroup}>Salvar</button>
           </>}>
           <div className="field"><label>Nome do grupo</label><input value={gName} onChange={(e) => setGName(e.target.value)} /></div>
-          <div className="field"><label>Descrição</label><textarea value={gDesc} onChange={(e) => setGDesc(e.target.value)} /></div>
+          <div className="field" style={{ marginBottom: 0 }}><label>Descrição</label><textarea value={gDesc} onChange={(e) => setGDesc(e.target.value)} /></div>
         </Modal>
       )}
 
-      {/* RP13 — apagar grupo com vários avisos */}
+      {leaveOpen && (
+        <ConfirmModal
+          title="Sair do grupo" danger confirmLabel="Sair do grupo"
+          message={<>Deseja sair de <b>{group.name}</b>? Seus chamados atribuídos ficarão sem responsável.</>}
+          onCancel={() => setLeaveOpen(false)} onConfirm={doLeave}
+        />
+      )}
+
       {delOpen && (
         <Modal title="⚠️ Apagar grupo" onClose={() => setDelOpen(false)}
           footer={delStep < 2 ? (
@@ -252,19 +295,18 @@ function SuporteAdmin({ group, user, bump, copy, isOwner, onDeleted, onLeft }) {
           ) : (
             <>
               <button onClick={() => setDelOpen(false)}>Cancelar</button>
-              <button className="btn-danger" onClick={confirmDelete}>Apagar definitivamente</button>
+              <button className="btn-danger" onClick={() => { deleteGroup(group.id, user); onExit(); }}>Apagar definitivamente</button>
             </>
           )}>
           {delStep === 0 && (
             <div className="alert alert-error" style={{ margin: 0 }}>
-              Você está prestes a apagar <b>{group.name}</b>. Todos os chamados, categorias,
-              serviços, chats e registros serão <b>permanentemente removidos</b>.
+              Você está prestes a apagar <b>{group.name}</b>. Todos os chamados, categorias, sistemas,
+              serviços, clientes, chats e registros serão <b>permanentemente removidos</b>.
             </div>
           )}
           {delStep === 1 && (
             <div className="alert alert-error" style={{ margin: 0 }}>
-              Esta ação <b>não pode ser desfeita</b>. Todos os membros perderão o acesso a este grupo.
-              Tem certeza absoluta?
+              Esta ação <b>não pode ser desfeita</b>. Todos os membros perderão o acesso a este grupo. Tem certeza absoluta?
             </div>
           )}
           {delStep === 2 && (

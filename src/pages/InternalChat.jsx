@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/store';
-import { internalMessages, postInternalMessage, categoriesForGroup } from '../lib/domain';
+import {
+  internalMessages, postInternalMessage, categoriesForGroup,
+  markChannelRead, channelUnread,
+} from '../lib/domain';
 import { Avatar, fmtDateTime } from '../components/ui';
 
 // RCS02 — chat interno dos técnicos, com canais: Geral + por categoria de dev.
@@ -20,6 +23,13 @@ export default function InternalChat() {
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [messages.length, channel]);
+
+  // ao abrir/trocar de canal, marca as mensagens como lidas
+  useEffect(() => {
+    markChannelRead(activeGroup.id, user.id, channel);
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel, messages.length]);
 
   const send = (e) => {
     e.preventDefault();
@@ -41,12 +51,16 @@ export default function InternalChat() {
         {/* canais */}
         <div className="card channels">
           <div className="channels-title">Canais</div>
-          {channels.map((c) => (
-            <button key={c.id} className={`channel ${channel === c.id ? 'active' : ''}`} onClick={() => setChannel(c.id)}>
-              <span>{c.icon}</span>
-              <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
-            </button>
-          ))}
+          {channels.map((c) => {
+            const un = c.id === channel ? 0 : channelUnread(activeGroup.id, user.id, c.id);
+            return (
+              <button key={c.id} className={`channel ${channel === c.id ? 'active' : ''}`} onClick={() => setChannel(c.id)}>
+                <span>{c.icon}</span>
+                <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                {un > 0 && <span className="nav-badge" style={{ marginLeft: 0 }}>{un}</span>}
+              </button>
+            );
+          })}
         </div>
 
         {/* conversa */}

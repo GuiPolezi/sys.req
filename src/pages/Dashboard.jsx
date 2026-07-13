@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ticketsVisibleTo, categoriesForGroup, STATUS, URGENCY } from '../lib/domain';
+import {
+  ticketsVisibleTo, categoriesForGroup, teamLoad, ticketsAwaitingReview, isTech,
+  STATUS, URGENCY,
+} from '../lib/domain';
 import { db } from '../lib/store';
 import { StatusBadge, UrgencyBadge, Empty, timeAgo } from '../components/ui';
-import { AreaChart, BarList, Donut } from '../components/Charts';
+import { AreaChart, BarList, Donut, ColumnChart } from '../components/Charts';
 
 const pad = (n) => String(n).padStart(2, '0');
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -52,12 +55,35 @@ export default function Dashboard() {
 
   const greeting = { suporte: 'Visão geral da equipe', dev: 'Seus chamados e da sua área', solicitante: 'Meus chamados' }[user.role];
 
+  // carga da equipe (só técnicos) e análises pendentes (só solicitante)
+  const tech = isTech(user.role);
+  const load = tech ? teamLoad(activeGroup) : [];
+  const awaiting = user.role === 'solicitante' ? ticketsAwaitingReview(activeGroup.id, user.id) : [];
+
   return (
     <div>
       <div className="page-head">
         <h1>Painel</h1>
         <p className="muted">{greeting} — {activeGroup.name}</p>
       </div>
+
+      {/* aviso destacado: chamados aguardando a análise do solicitante */}
+      {awaiting.length > 0 && (
+        <div className="card card-pad mb review-callout">
+          <div className="row between wrap" style={{ gap: 10 }}>
+            <div className="row" style={{ gap: 12 }}>
+              <span style={{ fontSize: 26 }}>🔎</span>
+              <div>
+                <b>{awaiting.length} chamado(s) aguardando a sua análise</b>
+                <div className="muted small">O time marcou como resolvido — confirme se está tudo certo ou rejeite.</div>
+              </div>
+            </div>
+            <button className="btn-primary btn-sm" onClick={() => navigate(`/tickets/${awaiting[0].id}`)}>
+              Revisar agora →
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="stats mb">
@@ -120,6 +146,22 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* carga da equipe — painel privado dos técnicos */}
+      {tech && (
+        <div className="card card-pad mb">
+          <div className="row between wrap" style={{ gap: 8 }}>
+            <div>
+              <h3 style={{ margin: 0 }}>👥 Carga da equipe</h3>
+              <span className="muted small">Chamados ativos atribuídos por técnico · visível apenas para a equipe</span>
+            </div>
+            <span className="chip">{load.reduce((s, d) => s + d.value, 0)} ativos</span>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            {load.length === 0 ? <Empty>Nenhum técnico no grupo.</Empty> : <ColumnChart data={load} height={170} color="#6A62A8" />}
+          </div>
+        </div>
+      )}
 
       {/* atividade recente */}
       <div className="row between mb">

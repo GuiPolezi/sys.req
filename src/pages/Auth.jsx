@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { createUser, joinGroupByCode } from '../lib/domain';
+import { registerUser } from '../lib/domain';
 import { forceReseed } from '../lib/seed';
 
 export default function Auth() {
@@ -79,12 +79,8 @@ function RegisterForm() {
     e.preventDefault();
     setError('');
     try {
-      const user = createUser({ ...form, role });
-      if (isRequester) {
-        // solicitante precisa entrar num grupo pelo código
-        if (!form.code.trim()) throw new Error('Informe o código de acesso fornecido pelo suporte.');
-        joinGroupByCode(user, form.code);
-      }
+      // registro ATÔMICO: valida o código antes de criar o usuário — nada é gravado se falhar
+      const user = registerUser({ ...form, role }, form.code);
       loginUser(user);
       navigate('/');
     } catch (err) {
@@ -139,9 +135,9 @@ function RegisterForm() {
 
       {isRequester && (
         <div className="field">
-          <label>Código de acesso do grupo</label>
-          <input value={form.code} onChange={set('code')} placeholder="Ex.: A1B2C3" />
-          <div className="hint">Fornecido pelo suporte da equipe que você vai atender.</div>
+          <label>Código de acesso do grupo *</label>
+          <input value={form.code} onChange={set('code')} placeholder="Ex.: A1B2C3" required />
+          <div className="hint">Fornecido pelo suporte da equipe que você vai atender. Sem ele o cadastro não é criado.</div>
         </div>
       )}
 

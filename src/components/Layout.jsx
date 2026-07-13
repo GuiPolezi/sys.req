@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { can, isTech, invitationsForUser } from '../lib/domain';
+import {
+  can, isTech, invitationsForUser, unreadNotifications,
+  internalUnreadTotal, unassignedTickets,
+} from '../lib/domain';
 import { Avatar, RoleBadge } from './ui';
 
 const RAIL_KEY = 'helpdesk_sidebar_rail';
@@ -16,8 +19,11 @@ export default function Layout({ children }) {
 
   const role = user.role;
   const tech = isTech(role);
-  void tick; // recomputa a contagem de convites a cada mutação
+  void tick; // recomputa os contadores a cada mutação
   const pendingInvites = invitationsForUser(user.id).length;
+  const unread = unreadNotifications(activeGroup.id, user.id);
+  const chatUnread = tech ? internalUnreadTotal(activeGroup, user.id) : 0;
+  const poolCount = tech ? unassignedTickets(activeGroup.id).length : 0;
 
   // ----- itens de navegação, agrupados por seção -----
   const sections = [
@@ -26,15 +32,16 @@ export default function Layout({ children }) {
         { to: '/', end: true, icon: '📊', label: 'Painel' },
         { to: '/tickets', icon: '🎫', label: 'Chamados' },
         { to: '/tickets/new', icon: '➕', label: 'Abrir chamado' },
+        { to: '/notifications', icon: '🔔', label: 'Notificações', badge: unread },
         tech && { to: '/assigned', icon: '📌', label: 'Atribuídos a mim' },
-        tech && { to: '/pool', icon: '📥', label: 'Não atribuídos' },
+        tech && { to: '/pool', icon: '📥', label: 'Não atribuídos', badge: poolCount, soft: true },
       ],
     },
     tech && {
       title: 'Equipe',
       items: [
-        { to: '/chat', icon: '💬', label: 'Chat interno' },
-        can.viewMembers(role) && { to: '/team', icon: '👥', label: 'Membros' },
+        { to: '/chat', icon: '💬', label: 'Chat interno', badge: chatUnread },
+        can.viewMembers(role) && { to: '/team', icon: '👥', label: 'Equipe' },
         { to: '/invites', icon: '✉️', label: 'Convites', badge: pendingInvites },
         can.registerAttendance(role) && { to: '/attendances', icon: '🗒️', label: 'Atendimentos' },
       ],
@@ -58,11 +65,11 @@ export default function Layout({ children }) {
   const handleLogout = () => { logout(); navigate('/login'); };
   const close = () => setMenuOpen(false);
 
-  const Item = ({ to, end, icon, label, badge }) => (
+  const Item = ({ to, end, icon, label, badge, soft }) => (
     <NavLink to={to} end={end} className="nav-link" title={label} onClick={close}>
       <span className="nav-ico">{icon}</span>
       <span className="nav-txt">{label}</span>
-      {badge > 0 && <span className="nav-badge">{badge}</span>}
+      {badge > 0 && <span className={`nav-badge ${soft ? 'soft' : ''}`}>{badge}</span>}
     </NavLink>
   );
 

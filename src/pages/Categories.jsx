@@ -1,29 +1,40 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/store';
-import { categoriesForGroup, createCategory, deleteCategory } from '../lib/domain';
-import { Modal, Empty } from '../components/ui';
+import {
+  categoriesForGroup, createCategory, updateCategory, deleteCategory, systemsForCategory,
+} from '../lib/domain';
+import { Modal, Empty, ConfirmModal } from '../components/ui';
 
 export default function Categories() {
   const { user, activeGroup, refresh } = useAuth();
   const [, setLocal] = useState(0);
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [systems, setSystems] = useState('');
+  const [editing, setEditing] = useState(null); // {id?, name}
+  const [confirm, setConfirm] = useState(null);
+  const [error, setError] = useState('');
   const bump = () => { refresh(); setLocal((n) => n + 1); };
 
   const categories = categoriesForGroup(activeGroup.id);
 
   const save = () => {
-    if (!name.trim()) return;
-    createCategory(activeGroup.id, { name, systems: systems.split(',') }, user);
-    setName(''); setSystems(''); setOpen(false); bump();
+    setError('');
+    try {
+      if (editing.id) updateCategory(editing.id, { name: editing.name }, user);
+      else createCategory(activeGroup.id, { name: editing.name }, user);
+      setEditing(null); bump();
+    } catch (err) { setError(err.message); }
   };
 
-  const remove = (id) => {
-    const count = db.filter('tickets', (t) => t.categoryId === id).length;
-    if (count > 0 && !confirm(`Esta categoria tem ${count} chamado(s). Eles ficarão sem categoria. Excluir mesmo assim?`)) return;
-    deleteCategory(id, user); bump();
+  const askDelete = (c) => {
+    const tickets = db.filter('tickets', (t) => t.categoryId === c.id).length;
+    const systems = systemsForCategory(c.id).length;
+    setConfirm({
+      category: c,
+      detail: [
+        tickets > 0 && `${tickets} chamado(s) ficarão sem categoria`,
+        systems > 0 && `${systems} sistema(s) ficarão sem categoria`,
+      ].filter(Boolean).join(' e ') || 'Nenhum registro depende dela.',
+    });
   };
 
   return (
@@ -31,27 +42,34 @@ export default function Categories() {
       <div className="row between page-head">
         <div>
           <h1>Categorias de desenvolvedor</h1>
-          <p className="muted">Definem áreas de atuação (Web, Desktop, Infra…). Classificam chamados e o que cada dev atende. RP14</p>
+          <p className="muted">Áreas de atuação (Web, Desktop, Infra…). Classificam chamados e definem o que cada dev atende.</p>
         </div>
-        <button className="btn-primary" onClick={() => setOpen(true)}>➕ Nova categoria</button>
+        <button className="btn-primary" onClick={() => { setError(''); setEditing({ name: '' }); }}>➕ Nova categoria</button>
       </div>
 
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
         {categories.length === 0 && <div className="card"><Empty>Nenhuma categoria. Crie a primeira.</Empty></div>}
         {categories.map((c) => {
           const count = db.filter('tickets', (t) => t.categoryId === c.id).length;
+          const systems = systemsForCategory(c.id);
           return (
             <div key={c.id} className="card card-pad">
               <div className="row between">
-                <div className="row" style={{ gap: 8 }}>
-                  <span className="dot" style={{ background: c.color, width: 12, height: 12 }} />
+                <div className="row" style={{ gap: 8, minWidth: 0 }}>
+                  <span className="dot" style={{ background: c.color, width: 12, height: 12, flexShrink: 0 }} />
                   <b>{c.name}</b>
                 </div>
-                <button className="btn-ghost btn-sm btn-danger" onClick={() => remove(c.id)}>🗑️</button>
+                <div className="row" style={{ gap: 2 }}>
+                  <button className="btn-ghost btn-sm" title="Editar" onClick={() => { setError(''); setEditing({ id: c.id, name: c.name }); }}>✏️</button>
+                  <button className="btn-ghost btn-sm btn-danger" title="Excluir" onClick={() => askDelete(c)}>🗑️</button>
+                </div>
               </div>
-              <div className="row wrap mt" style={{ gap: 6 }}>
-                {c.systems.length ? c.systems.map((s) => <span key={s} className="chip">{s}</span>)
-                  : <span className="muted small">Sem sistemas</span>}
+
+              <div className="muted small mt">Sistemas desta categoria:</div>
+              <div className="row wrap" style={{ gap: 6, marginTop: 6 }}>
+                {systems.length
+                  ? systems.map((s) => <span key={s.id} className="chip">🖥️ {s.name}</span>)
+                  : <span className="muted small">Nenhum — cadastre em <b>Sistemas</b>.</span>}
               </div>
               <div className="muted small mt">{count} chamado(s)</div>
             </div>
@@ -59,25 +77,34 @@ export default function Categories() {
         })}
       </div>
 
-      {open && (
+      {editing && (
         <Modal
-          title="Nova categoria de serviço"
-          onClose={() => setOpen(false)}
+          title={editing.id ? 'Editar categoria' : 'Nova categoria'}
+          onClose={() => setEditing(null)}
           footer={<>
-            <button onClick={() => setOpen(false)}>Cancelar</button>
+            <button onClick={() => setEditing(null)}>Cancelar</button>
             <button className="btn-primary" onClick={save}>Salvar</button>
           </>}
         >
-          <div className="field">
+          {error && <div className="alert alert-error">{error}</div>}
+          <div className="field" style={{ marginBottom: 0 }}>
             <label>Nome</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Siscam" autoFocus />
-          </div>
-          <div className="field">
-            <label>Sistemas (separados por vírgula)</label>
-            <input value={systems} onChange={(e) => setSystems(e.target.value)} placeholder="Ex.: Siscam 8, Siscam 9" />
-            <div className="hint">Aparecem como etiquetas no chamado.</div>
+            <input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+              placeholder="Ex.: Desenvolvimento Web" autoFocus />
+            <div className="hint">Os sistemas são vinculados à categoria na página <b>Sistemas</b>.</div>
           </div>
         </Modal>
+      )}
+
+      {confirm && (
+        <ConfirmModal
+          title="Excluir categoria"
+          danger
+          message={<>Excluir a categoria <b>{confirm.category.name}</b>? {confirm.detail}</>}
+          confirmLabel="Excluir"
+          onCancel={() => setConfirm(null)}
+          onConfirm={() => { deleteCategory(confirm.category.id, user); setConfirm(null); bump(); }}
+        />
       )}
     </div>
   );

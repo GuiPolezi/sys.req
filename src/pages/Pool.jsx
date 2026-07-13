@@ -21,11 +21,20 @@ export default function Pool() {
     navigate(`/tickets/${id}`);
   };
 
+  const urgent = tickets.filter((t) => t.urgency === 'alta').length;
+  const alerted = tickets.filter((t) => t.urgentAlert).length;
+
   return (
     <div>
       <div className="page-head">
         <h1>📥 Chamados sem atribuição</h1>
-        <p className="muted">{tickets.length} chamado(s) esperando alguém pegar. Assuma o que for da sua área.</p>
+        <p className="muted">Fila aberta a todos os técnicos. Assuma o que for da sua área.</p>
+      </div>
+
+      <div className="stats mb">
+        <div className="stat"><div className="n">{tickets.length}</div><div className="l">Aguardando responsável</div></div>
+        <div className="stat"><div className="n" style={{ color: '#C2542F' }}>{urgent}</div><div className="l">Urgência alta</div></div>
+        <div className="stat"><div className="n" style={{ color: '#C2542F' }}>{alerted}</div><div className="l">Com alerta 🚨</div></div>
       </div>
 
       <div className="card">

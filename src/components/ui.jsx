@@ -53,6 +53,25 @@ export function Empty({ children }) {
   return <div className="empty">{children}</div>;
 }
 
+// Confirmação padrão para ações destrutivas (exclusões).
+export function ConfirmModal({ title, message, confirmLabel = 'Confirmar', danger, onConfirm, onCancel }) {
+  return (
+    <Modal
+      title={title}
+      onClose={onCancel}
+      footer={<>
+        <button onClick={onCancel}>Cancelar</button>
+        <button className={danger ? 'btn-danger' : 'btn-primary'} onClick={onConfirm}>{confirmLabel}</button>
+      </>}
+    >
+      <div className={danger ? 'alert alert-error' : 'alert alert-info'} style={{ margin: 0 }}>
+        {message}
+      </div>
+      <p className="muted small" style={{ marginBottom: 0 }}>Esta ação não pode ser desfeita.</p>
+    </Modal>
+  );
+}
+
 export function timeAgo(iso) {
   const d = new Date(iso);
   const diff = (Date.now() - d.getTime()) / 1000;

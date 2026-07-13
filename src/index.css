@@ -376,7 +376,21 @@ label { display: block; font-weight: 600; font-size: 12.5px; margin-bottom: 6px;
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
 
 /* ---------- Misc ---------- */
-.chip { display: inline-flex; align-items: center; padding: 3px 9px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; font-size: 11.5px; font-weight: 500; color: var(--text-soft); }
+.chip {
+  display: inline-flex; align-items: center; padding: 3px 9px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px;
+  font-size: 11.5px; font-weight: 500; color: var(--text-soft);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* --- Anti-vazamento: nomes longos (categoria, sistema, serviço) nunca estouram o card --- */
+.card { min-width: 0; }
+.grid > * { min-width: 0; }
+/* textos dentro de cards quebram em vez de estourar */
+.card b, .card .t-title, .card .t-meta, .card p { overflow-wrap: anywhere; min-width: 0; }
+/* botões e badges nunca encolhem a ponto de cortar o rótulo */
+.card .row > button, .card .row > .btn, .card .row > .badge { flex-shrink: 0; }
+.ticket-row > div { min-width: 0; }
 .code-box { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 17px; letter-spacing: 3px; background: var(--primary-soft); border: 1px dashed var(--primary); color: var(--primary-dark); padding: 8px 14px; border-radius: var(--radius-sm); font-weight: 700; }
 .alert { padding: 11px 15px; border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 15px; }
 .alert-error { background: var(--danger-soft); border: 1px solid #E8CFC8; color: #8F3121; }
@@ -400,6 +414,23 @@ label { display: block; font-weight: 600; font-size: 12.5px; margin-bottom: 6px;
   justify-content: center;
 }
 .nav-link.active .nav-badge { background: #fff; color: var(--primary); }
+/* badge informativo (contagem), não é alerta */
+.nav-badge.soft { background: var(--border-strong); color: var(--text-soft); }
+.nav-link.active .nav-badge.soft { background: rgba(255,255,255,0.85); color: var(--primary-dark); }
+
+/* aviso de análise pendente (solicitante) */
+.review-callout {
+  border-color: #D6CCEA;
+  background: linear-gradient(180deg, #F3EFFA, var(--surface));
+}
+
+/* ---------- Notificações ---------- */
+.notif.unread { background: var(--primary-soft); }
+.notif.unread:hover { background: #EFDDD3; }
+.notif-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--primary); flex-shrink: 0;
+}
 
 /* ---------- Barra de progresso ---------- */
 .progress { height: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; margin-top: 6px; }
@@ -502,6 +533,7 @@ code {
 }
 .choose-card:hover { border-color: var(--primary); box-shadow: var(--shadow-md); background: var(--surface); }
 .choose-card b { font-size: 14.5px; }
+.choose-card b, .choose-card span { max-width: 100%; overflow-wrap: anywhere; white-space: normal; text-align: left; }
 .choose-ico { font-size: 26px; margin-bottom: 4px; }
 
 /* ---------- Editor de texto rico ---------- */
