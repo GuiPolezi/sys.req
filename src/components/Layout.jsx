@@ -1,21 +1,20 @@
-import { useState, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   can, isTech, invitationsForUser, unreadNotifications,
   internalUnreadTotal, unassignedTickets,
 } from '../lib/domain';
+import { getTheme, toggleTheme } from '../lib/theme';
 import { Avatar, RoleBadge } from './ui';
-
-const RAIL_KEY = 'helpdesk_sidebar_rail';
 
 export default function Layout({ children }) {
   const { user, groups, activeGroup, selectGroup, logout, tick } = useAuth();
   const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [rail, setRail] = useState(() => localStorage.getItem(RAIL_KEY) === '1');
-
-  useEffect(() => { localStorage.setItem(RAIL_KEY, rail ? '1' : '0'); }, [rail]);
+  const location = useLocation();
+  const [openMenu, setOpenMenu] = useState(null);   // chave do dropdown aberto
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [theme, setThemeState] = useState(getTheme());
 
   const role = user.role;
   const tech = isTech(role);
@@ -25,112 +24,180 @@ export default function Layout({ children }) {
   const chatUnread = tech ? internalUnreadTotal(activeGroup, user) : 0;
   const poolCount = tech ? unassignedTickets(activeGroup.id).length : 0;
 
-  // ----- itens de navegação, agrupados por seção -----
-  const sections = [
+  // ----- menus (sem ícones — minimalismo) -----
+  const menus = [
+    { key: 'painel', label: 'Painel', to: '/', end: true },
     {
+      key: 'chamados',
+      label: 'Chamados',
+      badge: 0,
       items: [
-        { to: '/', end: true, icon: '📊', label: 'Painel' },
-        { to: '/tickets', icon: '🎫', label: 'Chamados' },
-        { to: '/tickets/new', icon: '➕', label: 'Abrir chamado' },
-        { to: '/notifications', icon: '🔔', label: 'Notificações', badge: unread },
-        tech && { to: '/assigned', icon: '📌', label: 'Atribuídos a mim' },
-        tech && { to: '/pool', icon: '📥', label: 'Não atribuídos', badge: poolCount, soft: true },
-      ],
+        { to: '/tickets', label: 'Todos os chamados' },
+        { to: '/tickets/new', label: 'Abrir chamado' },
+        tech && { to: '/assigned', label: 'Atribuídos a mim' },
+        tech && { to: '/pool', label: 'Não atribuídos', badge: poolCount, soft: true },
+      ].filter(Boolean),
     },
     tech && {
-      title: 'Equipe',
+      key: 'equipe',
+      label: 'Equipe',
+      badge: chatUnread + pendingInvites,
       items: [
-        { to: '/chat', icon: '💬', label: 'Chat interno', badge: chatUnread },
-        can.viewMembers(role) && { to: '/team', icon: '👥', label: 'Equipe' },
-        { to: '/invites', icon: '✉️', label: 'Convites', badge: pendingInvites },
-        can.registerAttendance(role) && { to: '/attendances', icon: '🗒️', label: 'Atendimentos' },
-      ],
+        { to: '/chat', label: 'Chat interno', badge: chatUnread },
+        can.viewMembers(role) && { to: '/team', label: 'Equipe' },
+        { to: '/invites', label: 'Convites', badge: pendingInvites },
+        can.registerAttendance(role) && { to: '/attendances', label: 'Atendimentos' },
+      ].filter(Boolean),
     },
-    role === 'suporte' && {
-      title: 'Administração',
-      items: [
-        { to: '/categories', icon: '🗂️', label: 'Categorias' },
-        { to: '/systems', icon: '🖥️', label: 'Sistemas' },
-        { to: '/services', icon: '🧩', label: 'Serviços' },
-        { to: '/ranking', icon: '🏆', label: 'Ranking' },
-        { to: '/audit', icon: '📜', label: 'Auditoria' },
+    (role === 'suporte' || role === 'dev') && {
+      key: 'admin',
+      label: 'Administração',
+      badge: 0,
+      items: role === 'suporte' ? [
+        { to: '/categories', label: 'Categorias' },
+        { to: '/systems', label: 'Sistemas' },
+        { to: '/services', label: 'Serviços' },
+        { sep: true },
+        { to: '/ranking', label: 'Ranking' },
+        { to: '/audit', label: 'Auditoria' },
+      ] : [
+        { to: '/services', label: 'Serviços' },
       ],
-    },
-    role === 'dev' && {
-      title: 'Administração',
-      items: [{ to: '/services', icon: '🧩', label: 'Serviços' }],
     },
   ].filter(Boolean);
 
-  const handleLogout = () => { logout(); navigate('/login'); };
-  const close = () => setMenuOpen(false);
+  const accountItems = [
+    { to: '/profile', label: 'Meu perfil' },
+    { to: '/groups', label: 'Meus grupos' },
+    { sep: true },
+    { action: 'logout', label: 'Sair' },
+  ];
 
-  const Item = ({ to, end, icon, label, badge, soft }) => (
-    <NavLink to={to} end={end} className="nav-link" title={label} onClick={close}>
-      <span className="nav-ico">{icon}</span>
-      <span className="nav-txt">{label}</span>
-      {badge > 0 && <span className={`nav-badge ${soft ? 'soft' : ''}`}>{badge}</span>}
-    </NavLink>
-  );
+  const closeAll = () => { setOpenMenu(null); setMobileOpen(false); };
+  const handleLogout = () => { closeAll(); logout(); navigate('/login'); };
+  const flipTheme = () => setThemeState(toggleTheme());
+
+  const isCurrentSection = (menu) =>
+    menu.items?.some((it) => it.to && (it.to === '/' ? location.pathname === '/' : location.pathname.startsWith(it.to)));
+
+  const DropItem = ({ item }) => {
+    if (item.sep) return <div className="dd-sep" />;
+    if (item.action === 'logout') {
+      return <button className="dd-item" onClick={handleLogout}>Sair</button>;
+    }
+    return (
+      <NavLink to={item.to} end={item.end} className="dd-item" onClick={closeAll}>
+        {item.label}
+        <span className="spacer" />
+        {item.badge > 0 && <span className={`nav-badge ${item.soft ? 'soft' : ''}`}>{item.badge}</span>}
+      </NavLink>
+    );
+  };
 
   return (
     <div className="app-shell">
-      <div className={`sidebar-overlay ${menuOpen ? 'show' : ''}`} onClick={close} />
+      <header className="menubar">
+        <span className="brand">Help<b>Desk</b></span>
 
-      <aside className={`sidebar ${menuOpen ? 'open' : ''} ${rail ? 'rail' : ''}`}>
-        <div className="sidebar-head">
-          <div className="brand">
-            <span className="brand-ico">🛟</span>
-            <span className="brand-txt">HelpDesk</span>
+        {/* navegação desktop */}
+        {menus.map((m) => m.to ? (
+          <div className="menu-wrap desktop" key={m.key}>
+            <NavLink to={m.to} end={m.end} className="menu-trigger" onClick={closeAll}>
+              {m.label}
+            </NavLink>
           </div>
+        ) : (
+          <div className="menu-wrap desktop" key={m.key}>
+            <button
+              className={`menu-trigger ${openMenu === m.key ? 'open' : ''} ${isCurrentSection(m) ? 'current' : ''}`}
+              onClick={() => setOpenMenu(openMenu === m.key ? null : m.key)}
+            >
+              {m.label} <span className="caret">▾</span>
+              {m.badge > 0 && openMenu !== m.key && <span className="trigger-dot" />}
+            </button>
+            {openMenu === m.key && (
+              <div className="dropdown">
+                {m.items.map((it, i) => <DropItem key={it.to || `s${i}`} item={it} />)}
+              </div>
+            )}
+          </div>
+        ))}
+
+        {/* notificações — acesso direto */}
+        <div className="menu-wrap desktop">
+          <NavLink to="/notifications" className="menu-trigger" onClick={closeAll}>
+            Notificações
+            {unread > 0 && <span className="nav-badge" style={{ marginLeft: 6 }}>{unread}</span>}
+          </NavLink>
         </div>
 
-        <nav className="sidebar-nav">
-          {sections.map((sec, i) => (
-            <div key={i} className="nav-group">
-              {sec.title && <div className="nav-section">{sec.title}</div>}
-              {sec.items.filter(Boolean).map((it) => <Item key={it.to} {...it} />)}
-            </div>
-          ))}
-        </nav>
+        <div className="spacer" />
 
-        <div className="sidebar-foot">
-          <Item to="/groups" icon="🗃️" label="Meus grupos" />
-          <Item to="/profile" icon="🙍" label="Meu perfil" />
-          <button className="collapse-btn" onClick={() => setRail((v) => !v)} title={rail ? 'Expandir menu' : 'Recolher menu'}>
-            <span className="nav-ico">{rail ? '»' : '«'}</span>
-            <span className="nav-txt">Recolher</span>
-          </button>
-        </div>
-      </aside>
+        {/* hambúrguer (mobile) */}
+        <button className="menu-btn btn-sm" onClick={() => { setMobileOpen((v) => !v); setOpenMenu(null); }}>
+          Menu{(unread + chatUnread + pendingInvites) > 0 && <span className="nav-badge">{unread + chatUnread + pendingInvites}</span>}
+        </button>
 
-      <div className="main">
-        <header className="topbar">
-          <button className="menu-btn btn-sm" onClick={() => setMenuOpen((v) => !v)} aria-label="Abrir menu">☰</button>
+        {groups.length > 1 ? (
+          <select className="group-select" value={activeGroup.id} onChange={(e) => selectGroup(e.target.value)}>
+            {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+        ) : (
+          <span className="muted small" style={{ whiteSpace: 'nowrap', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {activeGroup.name}
+          </span>
+        )}
 
-          {groups.length > 1 ? (
-            <select className="group-select" value={activeGroup.id} onChange={(e) => selectGroup(e.target.value)}>
-              {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
-          ) : (
-            <span className="title">{activeGroup.name}</span>
-          )}
+        <button className="theme-btn" onClick={flipTheme} title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}>
+          {theme === 'dark' ? '☀︎' : '☾'}
+        </button>
 
-          <div className="spacer" />
-
-          <span className="topbar-role"><RoleBadge role={user.role} /></span>
-          <div className="row topbar-user" style={{ gap: 8 }}>
+        {/* conta */}
+        <div className="menu-wrap">
+          <button className="user-chip" onClick={() => setOpenMenu(openMenu === 'conta' ? null : 'conta')}>
             <Avatar name={user.name} size="sm" />
-            <div className="col">
-              <span style={{ fontWeight: 600, fontSize: 13 }}>{user.name}</span>
-              <span className="muted small">{user.email}</span>
+            <span className="u-name">{user.name}</span>
+            <span className="caret">▾</span>
+          </button>
+          {openMenu === 'conta' && (
+            <div className="dropdown right">
+              <div style={{ padding: '8px 12px 4px' }}>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>{user.name}</div>
+                <div className="muted small">{user.email || user.login}</div>
+                <div style={{ marginTop: 6 }}><RoleBadge role={user.role} /></div>
+              </div>
+              <div className="dd-sep" />
+              {accountItems.map((it, i) => <DropItem key={it.to || it.action || i} item={it} />)}
             </div>
-          </div>
-          <button className="btn-sm" onClick={handleLogout}>Sair</button>
-        </header>
+          )}
+        </div>
+      </header>
 
-        <div className="content">{children}</div>
-      </div>
+      {/* fecha dropdowns ao clicar fora */}
+      {openMenu && <div className="menu-overlay" onClick={() => setOpenMenu(null)} />}
+
+      {/* menu mobile — folha de vidro */}
+      {mobileOpen && (
+        <>
+          <div className="menu-overlay" onClick={closeAll} />
+          <div className="mobile-sheet">
+            <NavLink to="/" end className="dd-item" onClick={closeAll}>Painel</NavLink>
+            <NavLink to="/notifications" className="dd-item" onClick={closeAll}>
+              Notificações<span className="spacer" />{unread > 0 && <span className="nav-badge">{unread}</span>}
+            </NavLink>
+            {menus.filter((m) => m.items).map((m) => (
+              <div key={m.key}>
+                <div className="msheet-title">{m.label}</div>
+                {m.items.map((it, i) => <DropItem key={it.to || `s${i}`} item={it} />)}
+              </div>
+            ))}
+            <div className="msheet-title">Conta</div>
+            {accountItems.map((it, i) => <DropItem key={it.to || it.action || i} item={it} />)}
+          </div>
+        </>
+      )}
+
+      <div className="content">{children}</div>
     </div>
   );
 }

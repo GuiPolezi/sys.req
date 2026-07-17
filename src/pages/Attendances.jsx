@@ -186,7 +186,7 @@ function ByTech({ group, selected, setSelected, today }) {
       <div className="card card-pad">
         <h3>Total acumulado</h3>
         <p className="muted small">Todos os atendimentos do grupo · {allTotal} no total</p>
-        {allTotal === 0 ? <Empty>Nenhum atendimento registrado.</Empty> : <ColumnChart data={total} height={180} color="#6A62A8" />}
+        {allTotal === 0 ? <Empty>Nenhum atendimento registrado.</Empty> : <ColumnChart data={total} height={180} color="#7A74C9" />}
         <div className="divider" />
         <div className="col" style={{ gap: 8 }}>
           {total.map((t) => (

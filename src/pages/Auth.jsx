@@ -3,15 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { registerUser } from '../lib/domain';
 import { forceReseed } from '../lib/seed';
+import { getTheme, toggleTheme } from '../lib/theme';
 
 export default function Auth() {
   const [tab, setTab] = useState('login');
+  const [theme, setThemeState] = useState(getTheme());
   return (
-    <div className="auth-wrap">
+    <div className="auth-wrap" style={{ position: 'relative' }}>
+      <button className="theme-btn" style={{ position: 'absolute', top: 18, right: 18 }}
+        onClick={() => setThemeState(toggleTheme())}
+        title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}>
+        {theme === 'dark' ? '☀︎' : '☾'}
+      </button>
       <div className="auth-card">
         <div className="card card-pad">
-          <div className="brand" style={{ color: 'var(--text)', fontSize: 22, justifyContent: 'center', marginBottom: 8 }}>
-            🛟 HelpDesk <span className="muted small" style={{ fontWeight: 400 }}>alpha</span>
+          <div style={{ textAlign: 'center', marginBottom: 14, fontSize: 24, fontWeight: 300, letterSpacing: '0.05em' }}>
+            Help<b style={{ fontWeight: 650, color: 'var(--primary)' }}>Desk</b>{' '}
+            <span className="muted small" style={{ fontWeight: 300 }}>alpha</span>
           </div>
           <div className="auth-tabs">
             <button className={tab === 'login' ? 'btn-primary' : ''} onClick={() => setTab('login')}>Entrar</button>

@@ -86,11 +86,11 @@ function RequesterPanel({ user, group }) {
       <h3>📋 Minhas solicitações — {group.name}</h3>
       <div className="stats mb" style={{ marginTop: 10 }}>
         <div className="stat"><div className="n">{stats.total}</div><div className="l">Total abertas</div></div>
-        <div className="stat"><div className="n" style={{ color: '#4F8A5B' }}>{stats.concluido}</div><div className="l">Concluídas</div></div>
-        <div className="stat"><div className="n" style={{ color: '#C08A3E' }}>{stats.emAndamento}</div><div className="l">Em andamento</div></div>
+        <div className="stat"><div className="n" style={{ color: '#34B27A' }}>{stats.concluido}</div><div className="l">Concluídas</div></div>
+        <div className="stat"><div className="n" style={{ color: '#E3A93C' }}>{stats.emAndamento}</div><div className="l">Em andamento</div></div>
       </div>
       <div className="muted small">Taxa de conclusão: {pct}%</div>
-      <div className="progress"><div className="progress-fill" style={{ width: `${pct}%`, background: '#4F8A5B' }} /></div>
+      <div className="progress"><div className="progress-fill" style={{ width: `${pct}%`, background: '#34B27A' }} /></div>
     </div>
   );
 }
@@ -113,9 +113,9 @@ function DevPanel({ user, group, refresh }) {
     <div className="card card-pad mb">
       <h3>🎮 Progresso no grupo — {group.name}</h3>
       <div className="stats mb" style={{ marginTop: 10 }}>
-        <div className="stat"><div className="n" style={{ color: '#6A62A8' }}>Nível {stats.level}</div><div className="l">{stats.xp} XP</div></div>
-        <div className="stat"><div className="n" style={{ color: '#4F8A5B' }}>{stats.finished}</div><div className="l">Finalizados</div></div>
-        <div className="stat"><div className="n" style={{ color: '#C08A3E' }}>{stats.active}</div><div className="l">Ativos</div></div>
+        <div className="stat"><div className="n" style={{ color: '#7A74C9' }}>Nível {stats.level}</div><div className="l">{stats.xp} XP</div></div>
+        <div className="stat"><div className="n" style={{ color: '#34B27A' }}>{stats.finished}</div><div className="l">Finalizados</div></div>
+        <div className="stat"><div className="n" style={{ color: '#E3A93C' }}>{stats.active}</div><div className="l">Ativos</div></div>
         <div className="stat"><div className="n">{stats.assigned}</div><div className="l">Total atribuídos</div></div>
       </div>
       <div className="muted small">Progresso p/ o nível {stats.level + 1}</div>

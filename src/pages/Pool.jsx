@@ -33,8 +33,8 @@ export default function Pool() {
 
       <div className="stats mb">
         <div className="stat"><div className="n">{tickets.length}</div><div className="l">Aguardando responsável</div></div>
-        <div className="stat"><div className="n" style={{ color: '#C2542F' }}>{urgent}</div><div className="l">Urgência alta</div></div>
-        <div className="stat"><div className="n" style={{ color: '#C2542F' }}>{alerted}</div><div className="l">Com alerta 🚨</div></div>
+        <div className="stat"><div className="n" style={{ color: '#E06A4E' }}>{urgent}</div><div className="l">Urgência alta</div></div>
+        <div className="stat"><div className="n" style={{ color: '#E06A4E' }}>{alerted}</div><div className="l">Com alerta 🚨</div></div>
       </div>
 
       <div className="card">

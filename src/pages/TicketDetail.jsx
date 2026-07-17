@@ -51,18 +51,18 @@ export default function TicketDetail() {
 
       {/* faixas de estado */}
       {closed && (
-        <div className="alert" style={{ background: '#E8F0E6', border: '1px solid #C6DBC2', color: '#3B6B44' }}>
+        <div className="alert alert-ok">
           ✅ <b>Chamado concluído e encerrado.</b> O chat e todas as edições estão bloqueados.
         </div>
       )}
       {!closed && ticket.urgentAlert && (
-        <div className="alert" style={{ background: 'var(--danger-soft)', border: '1px solid #E8CFC8', color: '#8F3121' }}>
+        <div className="alert alert-error">
           🚨 <b>Alerta de urgência</b> enviado pelo solicitante — este chamado precisa de atenção imediata.
         </div>
       )}
       {!closed && ticket.status === 'em_analise' && (
         isRequester ? (
-          <div className="alert" style={{ background: '#EFE9F7', border: '1px solid #D6CCEA', color: '#4E4482' }}>
+          <div className="alert alert-review">
             🔎 <b>Aguardando a sua análise.</b> O time marcou este chamado como resolvido —
             confirme abaixo se está tudo certo ou rejeite para devolvê-lo.
           </div>

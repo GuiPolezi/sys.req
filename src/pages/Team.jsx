@@ -253,7 +253,7 @@ function Settings({ group, user, isSuporte, bump, onExit }) {
       </div>
 
       {/* zona de perigo */}
-      <div className="card card-pad" style={{ borderColor: '#E8CFC8' }}>
+      <div className="card card-pad" style={{ borderColor: 'var(--danger-border)' }}>
         <h3>⚠️ Zona de perigo</h3>
         <div className="row wrap between" style={{ gap: 10 }}>
           <p className="muted small" style={{ margin: 0, flex: 1, minWidth: 220 }}>

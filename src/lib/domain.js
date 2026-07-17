@@ -3,25 +3,25 @@
 // =============================================================
 import { db, uid, nowISO, shortCode } from './store';
 
-// Paleta quente e harmônica com o tema "paper/clay"
+// Paleta "aero" — tons vivos aqua/verde/âmbar, legíveis no claro e no escuro
 export const ROLES = {
-  suporte: { label: 'Suporte', color: '#C15F3C' },
-  dev: { label: 'Desenvolvedor', color: '#6A62A8' },
-  solicitante: { label: 'Solicitante', color: '#3F8F7B' },
+  suporte: { label: 'Suporte', color: '#0F9BD7' },
+  dev: { label: 'Desenvolvedor', color: '#7A74C9' },
+  solicitante: { label: 'Solicitante', color: '#2FA8A8' },
 };
 
 export const STATUS = {
-  aberto: { label: 'Aberto', color: '#C2542F' },
-  em_andamento: { label: 'Em andamento', color: '#C08A3E' },
-  aguardando: { label: 'Aguardando', color: '#4A8D9E' },
-  em_analise: { label: 'Em análise', color: '#6A62A8' },
-  concluido: { label: 'Concluído', color: '#4F8A5B' },
+  aberto: { label: 'Aberto', color: '#E06A4E' },
+  em_andamento: { label: 'Em andamento', color: '#E3A93C' },
+  aguardando: { label: 'Aguardando', color: '#2FA8A8' },
+  em_analise: { label: 'Em análise', color: '#7A74C9' },
+  concluido: { label: 'Concluído', color: '#34B27A' },
 };
 
 export const URGENCY = {
-  baixa: { label: 'Baixa', color: '#4F8A5B', weight: 1 },
-  media: { label: 'Média', color: '#C08A3E', weight: 2 },
-  alta: { label: 'Alta', color: '#C2542F', weight: 3 },
+  baixa: { label: 'Baixa', color: '#34B27A', weight: 1 },
+  media: { label: 'Média', color: '#E3A93C', weight: 2 },
+  alta: { label: 'Alta', color: '#E06A4E', weight: 3 },
 };
 
 export const TICKET_TYPES = ['Solicitação', 'Erro', 'Dúvida', 'Melhoria', 'Ajuste'];
@@ -337,7 +337,7 @@ export function respondInvitation(inviteId, accept) {
 // ------------------------------------------------------------
 //  CATEGORIAS DE DESENVOLVEDOR
 // ------------------------------------------------------------
-const CAT_COLORS = ['#C15F3C', '#6A62A8', '#4A8D9E', '#B5567E', '#C08A3E', '#4F8A5B', '#8A6D4B'];
+const CAT_COLORS = ['#0F9BD7', '#7A74C9', '#2FA8A8', '#D96BA0', '#E3A93C', '#34B27A', '#5F8FD9'];
 
 export function categoriesForGroup(groupId) {
   return db.filter('categories', (c) => c.groupId === groupId);

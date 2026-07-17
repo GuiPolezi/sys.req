@@ -2,60 +2,45 @@ import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { createGroup, joinGroupByCode, isTech, invitationsForUser } from '../lib/domain';
+import { getTheme, toggleTheme } from '../lib/theme';
 import { Avatar } from '../components/ui';
 
 // Shell mínimo mostrado quando o usuário não tem grupo ativo (RP04).
 function NoGroupShell({ children }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [theme, setThemeState] = useState(getTheme());
   const tech = isTech(user.role);
   const pending = tech ? invitationsForUser(user.id).length : 0;
-  const close = () => setMenuOpen(false);
   return (
     <div className="app-shell">
-      <div className={`sidebar-overlay ${menuOpen ? 'show' : ''}`} onClick={close} />
-      <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
-        <div className="sidebar-head">
-          <div className="brand">
-            <span className="brand-ico">🛟</span>
-            <span className="brand-txt">HelpDesk</span>
-          </div>
+      <header className="menubar">
+        <span className="brand">Help<b>Desk</b></span>
+        <div className="menu-wrap">
+          <NavLink to="/" end className="menu-trigger">Grupos</NavLink>
         </div>
-        <nav className="sidebar-nav">
-          <NavLink to="/" end className="nav-link" onClick={close}>
-            <span className="nav-ico">🏠</span><span className="nav-txt">Grupos</span>
-          </NavLink>
-          <NavLink to="/profile" className="nav-link" onClick={close}>
-            <span className="nav-ico">🙍</span><span className="nav-txt">Meu perfil</span>
-          </NavLink>
-          {tech && (
-            <NavLink to="/invites" className="nav-link" onClick={close}>
-              <span className="nav-ico">✉️</span><span className="nav-txt">Convites</span>
-              {pending > 0 && <span className="nav-badge">{pending}</span>}
+        <div className="menu-wrap">
+          <NavLink to="/profile" className="menu-trigger">Meu perfil</NavLink>
+        </div>
+        {tech && (
+          <div className="menu-wrap">
+            <NavLink to="/invites" className="menu-trigger">
+              Convites{pending > 0 && <span className="nav-badge" style={{ marginLeft: 6 }}>{pending}</span>}
             </NavLink>
-          )}
-        </nav>
-        <div className="sidebar-foot">
-          <div className="row" style={{ gap: 8, padding: '4px 6px 8px' }}>
-            <Avatar name={user.name} size="sm" />
-            <span className="small nav-txt" style={{ color: 'var(--text-soft)' }}>{user.name}</span>
           </div>
-          <button className="btn-sm" onClick={() => { logout(); navigate('/login'); }}>Sair</button>
+        )}
+        <div className="spacer" />
+        <button className="theme-btn" onClick={() => setThemeState(toggleTheme())}
+          title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}>
+          {theme === 'dark' ? '☀︎' : '☾'}
+        </button>
+        <div className="row" style={{ gap: 8 }}>
+          <Avatar name={user.name} size="sm" />
+          <span className="small" style={{ color: 'var(--text-soft)' }}>{user.name}</span>
         </div>
-      </aside>
-      <div className="main">
-        <header className="topbar">
-          <button className="menu-btn btn-sm" onClick={() => setMenuOpen((v) => !v)} aria-label="Abrir menu">☰</button>
-          <span className="title">Sem grupo ativo</span>
-          <div className="spacer" />
-          <div className="row topbar-user" style={{ gap: 8 }}>
-            <Avatar name={user.name} size="sm" />
-            <div className="col"><span style={{ fontWeight: 600, fontSize: 13 }}>{user.name}</span></div>
-          </div>
-        </header>
-        <div className="content">{children}</div>
-      </div>
+        <button className="btn-sm" onClick={() => { logout(); navigate('/login'); }}>Sair</button>
+      </header>
+      <div className="content">{children}</div>
     </div>
   );
 }

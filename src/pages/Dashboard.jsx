@@ -88,12 +88,12 @@ export default function Dashboard() {
       {/* KPIs */}
       <div className="stats mb">
         <div className="stat"><div className="n">{tickets.length}</div><div className="l">Total de chamados</div></div>
-        <div className="stat"><div className="n" style={{ color: '#C2542F' }}>{urgent.length}</div><div className="l">Urgentes ⚠️</div></div>
+        <div className="stat"><div className="n" style={{ color: '#E06A4E' }}>{urgent.length}</div><div className="l"><strong>Urgentes</strong></div></div>
         <div className="stat"><div className="n">{open.length}</div><div className="l">Em aberto</div></div>
         {user.role !== 'solicitante' && (
-          <div className="stat"><div className="n" style={{ color: '#C08A3E' }}>{mine.length}</div><div className="l">Atribuídos a mim</div></div>
+          <div className="stat"><div className="n" style={{ color: '#E3A93C' }}>{mine.length}</div><div className="l">Atribuídos a mim</div></div>
         )}
-        <div className="stat"><div className="n" style={{ color: '#4F8A5B' }}>{done.length}</div><div className="l">Concluídos</div></div>
+        <div className="stat"><div className="n" style={{ color: '#34B27A' }}>{done.length}</div><div className="l">Concluídos</div></div>
       </div>
 
       {/* série temporal */}
@@ -158,7 +158,7 @@ export default function Dashboard() {
             <span className="chip">{load.reduce((s, d) => s + d.value, 0)} ativos</span>
           </div>
           <div style={{ marginTop: 14 }}>
-            {load.length === 0 ? <Empty>Nenhum técnico no grupo.</Empty> : <ColumnChart data={load} height={170} color="#6A62A8" />}
+            {load.length === 0 ? <Empty>Nenhum técnico no grupo.</Empty> : <ColumnChart data={load} height={170} color="#7A74C9" />}
           </div>
         </div>
       )}
