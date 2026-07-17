@@ -34,7 +34,7 @@ export default function Notifications() {
   };
 
   return (
-    <div style={{ maxWidth: 760 }}>
+    <div>
       <div className="row between wrap page-head" style={{ gap: 10 }}>
         <div>
           <h1>🔔 Notificações</h1>
