@@ -17,7 +17,7 @@ export default function Ranking() {
   const rest = ranking.slice(3);
 
   return (
-    <div style={{ maxWidth: 860 }}>
+    <div>
       <div className="page-head">
         <h1>🏆 Ranking de solicitantes</h1>
         <p className="muted">Quem mais abre chamados no grupo. Técnicos não entram na contagem.</p>
