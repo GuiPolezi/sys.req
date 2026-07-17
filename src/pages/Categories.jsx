@@ -47,7 +47,7 @@ export default function Categories() {
         <button className="btn-primary" onClick={() => { setError(''); setEditing({ name: '' }); }}>➕ Nova categoria</button>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
         {categories.length === 0 && <div className="card"><Empty>Nenhuma categoria. Crie a primeira.</Empty></div>}
         {categories.map((c) => {
           const count = db.filter('tickets', (t) => t.categoryId === c.id).length;
