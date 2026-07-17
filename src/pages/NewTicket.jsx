@@ -91,7 +91,7 @@ export default function NewTicket() {
   // ---------- Passo 1: sistema afetado ----------
   if (step === 'system') {
     return (
-      <div style={{ maxWidth: 760 }}>
+      <div>
         <div className="page-head">
           <h1>Abrir chamado</h1>
           <p className="muted">Passo 1 de 3 — qual <b>sistema</b> está com problema?</p>
