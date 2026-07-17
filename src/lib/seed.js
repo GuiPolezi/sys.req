@@ -5,7 +5,7 @@ import { db, isSeeded, markSeeded, COLLECTIONS, resetAll } from './store';
 import {
   createUser, createGroup, createCategory, createSystem, createTicket,
   joinGroupByCode, updateMemberCategories, createService, createClient,
-  createCity, createSla, createWorkflow, setMemberManager,
+  createCity, createSla, createWorkflow, setMemberManager, setMemberRole,
   registerAttendance, createInvitation, sendToReview,
   postTicketMessage, postInternalMessage,
 } from './domain';
@@ -50,12 +50,14 @@ export function seedIfNeeded() {
   const sSite = createSystem(group.id, { name: 'Site institucional', categoryId: web.id }, ana);
   createSystem(group.id, { name: 'Siscam Web', categoryId: web.id }, ana);
 
-  // --- membros (código decide o papel) --------------------------
-  joinGroupByCode(bruno, group.techInviteCode);
-  joinGroupByCode(carla, group.techInviteCode);
-  joinGroupByCode(davi, group.requesterCode);
-  joinGroupByCode(elis, group.requesterCode);
+  // --- membros (v0.0.6: todos entram como solicitante; a equipe promove) ---
+  joinGroupByCode(bruno, group.accessCode, 'São Paulo');
+  joinGroupByCode(carla, group.accessCode, 'São Paulo');
+  joinGroupByCode(davi, group.accessCode, 'Itajubá');
+  joinGroupByCode(elis, group.accessCode, 'Itajubá');
 
+  setMemberRole(group.id, bruno.id, 'dev', ana);
+  setMemberRole(group.id, carla.id, 'dev', ana);
   updateMemberCategories(group.id, bruno.id, [desktop.id], ana);
   updateMemberCategories(group.id, carla.id, [web.id], ana);
   setMemberManager(group.id, bruno.id, true, ana); // Bruno é gerente

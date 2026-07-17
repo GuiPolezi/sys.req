@@ -83,9 +83,8 @@ function RegisterForm() {
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
-  // detecta em tempo real o tipo do código digitado
+  // detecta em tempo real o grupo do código digitado
   const match = groupForCode(form.code);
-  const isRequesterCode = match?.kind === 'solicitante';
   const groupCities = match ? cityList(match.group.id) : [];
 
   const submit = (e) => {
@@ -129,15 +128,15 @@ function RegisterForm() {
         <input value={form.code} onChange={set('code')} placeholder="Ex.: A1B2C3" />
         {match ? (
           <div className="hint">
-            ✓ Código do grupo <b>{match.group.name}</b> — você entrará como{' '}
-            <b>{isRequesterCode ? 'solicitante' : 'técnico'}</b>.
+            ✓ Código do grupo <b>{match.group.name}</b> — você entra como <b>solicitante</b>;
+            a equipe pode promover seu acesso depois.
           </div>
         ) : (
           <div className="hint">Com código você já entra num grupo. Sem código, crie ou entre num grupo depois.</div>
         )}
       </div>
 
-      {isRequesterCode && (
+      {match && (
         <div className="field">
           <label>Cidade *</label>
           {groupCities.length ? (

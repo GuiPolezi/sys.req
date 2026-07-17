@@ -676,6 +676,15 @@ label { display: block; font-weight: 600; font-size: 12px; margin-bottom: 6px; c
 .colchart-val { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 700; color: var(--text-soft); }
 .colchart-label { font-size: 10px; color: var(--muted); margin-top: 5px; }
 
+/* ---------- Indicador de presença ---------- */
+.presence-dot {
+  position: absolute; right: -2px; bottom: -2px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--muted); opacity: 0.55;
+  border: 2px solid var(--surface-solid);
+}
+.presence-dot.on { background: #34B27A; opacity: 1; box-shadow: 0 0 6px rgba(52, 178, 122, 0.6); }
+
 /* ---------- Número do chamado ---------- */
 .tkt-num {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

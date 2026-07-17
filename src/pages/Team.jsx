@@ -6,7 +6,10 @@ import {
   createInvitation, invitationsForGroup, updateGroup, leaveGroup, deleteGroup,
   setMemberRole, setMemberManager, adminUpdateUser, removeMember,
   groupPermissions, updateGroupPermissions, cityList, requesterStats, devStats,
+  groupAccessCode, isOnline, lastSeen, teamLoad, attendancesByTech, isTech,
 } from '../lib/domain';
+import { ColumnChart } from '../components/Charts';
+import { timeAgo } from '../components/ui';
 import { downloadCSV } from '../lib/report';
 import { RoleBadge, Avatar, Modal, ConfirmModal, Empty } from '../components/ui';
 
@@ -14,11 +17,12 @@ export default function Team() {
   const { user, activeGroup, refresh, selectGroup, groups } = useAuth();
   const navigate = useNavigate();
   const [, setLocal] = useState(0);
-  const [tab, setTab] = useState('tecnicos');
+  const [tab, setTab] = useState('visao');
   const [q, setQ] = useState('');
   const bump = () => { refresh(); setLocal((n) => n + 1); };
 
   const isSuporte = user.role === 'suporte';
+  const canManageMembers = isTech(user.role); // v0.0.6: técnicos (sup e dev) definem papéis
   const members = groupMembers(activeGroup);
   const categories = categoriesForGroup(activeGroup.id);
   const tecnicos = members.filter((m) => m.role !== 'solicitante');
@@ -55,7 +59,10 @@ export default function Team() {
         <p className="muted">{activeGroup.description || 'Integrantes e configurações do grupo.'}</p>
       </div>
 
-      <div className="auth-tabs" style={{ maxWidth: 560 }}>
+      <div className="auth-tabs" style={{ maxWidth: 680 }}>
+        <button className={tab === 'visao' ? 'btn-primary' : ''} onClick={() => setTab('visao')}>
+          Visão geral
+        </button>
         <button className={tab === 'tecnicos' ? 'btn-primary' : ''} onClick={() => setTab('tecnicos')}>
           Técnicos ({tecnicos.length})
         </button>
@@ -63,9 +70,14 @@ export default function Team() {
           Solicitantes ({solicitantes.length})
         </button>
         <button className={tab === 'config' ? 'btn-primary' : ''} onClick={() => setTab('config')}>
-          ⚙️ Configurações
+          Configurações
         </button>
       </div>
+
+      {tab === 'visao' && (
+        <TeamOverview group={activeGroup} members={members} tecnicos={tecnicos}
+          solicitantes={solicitantes} categories={categories} />
+      )}
 
       {tab === 'tecnicos' && (
         <div>
@@ -77,8 +89,8 @@ export default function Team() {
           )}
           <div className="card">
             {tecnicos.map((m) => (
-              <div key={m.userId} className="ticket-row" style={{ alignItems: 'flex-start', cursor: isSuporte ? 'pointer' : 'default' }}
-                onClick={() => isSuporte && setOpenMember(m)}>
+              <div key={m.userId} className="ticket-row" style={{ alignItems: 'flex-start', cursor: canManageMembers ? 'pointer' : 'default' }}
+                onClick={() => canManageMembers && setOpenMember(m)}>
                 <Avatar name={m.user.name} />
                 <div style={{ flex: 1 }}>
                   <div className="row wrap" style={{ gap: 8 }}>
@@ -132,8 +144,8 @@ export default function Team() {
                 return m.user.name.toLowerCase().includes(s) || (m.user.cidade || '').toLowerCase().includes(s);
               })
               .map((m) => (
-                <div key={m.userId} className="ticket-row" style={{ cursor: isSuporte ? 'pointer' : 'default' }}
-                  onClick={() => isSuporte && setOpenMember(m)}>
+                <div key={m.userId} className="ticket-row" style={{ cursor: canManageMembers ? 'pointer' : 'default' }}
+                  onClick={() => canManageMembers && setOpenMember(m)}>
                   <Avatar name={m.user.name} size="sm" />
                   <div style={{ flex: 1 }}>
                     <b className="small">{m.user.name}</b>
@@ -154,6 +166,109 @@ export default function Team() {
       {tab === 'config' && (
         <Settings group={activeGroup} user={user} isSuporte={isSuporte} bump={bump} onExit={afterExit} />
       )}
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+//  Visão geral da equipe (v0.0.6) — categorias × membros, online, carga
+// -------------------------------------------------------------
+function TeamOverview({ group, members, tecnicos, solicitantes, categories }) {
+  const online = tecnicos.filter((m) => isOnline(group.id, m.userId));
+  const load = teamLoad(group);
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const attToday = attendancesByTech(group, todayKey).reduce((s, d) => s + d.value, 0);
+
+  const membersOfCategory = (catId) =>
+    tecnicos.filter((m) => (m.categoryIds || []).includes(catId));
+  const uncategorized = tecnicos.filter((m) => m.role === 'dev' && !(m.categoryIds || []).length);
+
+  return (
+    <div>
+      {/* números da equipe */}
+      <div className="stats mb">
+        <div className="stat"><div className="n">{members.length}</div><div className="l">Membros</div></div>
+        <div className="stat"><div className="n">{tecnicos.length}</div><div className="l">Técnicos</div></div>
+        <div className="stat"><div className="n">{solicitantes.length}</div><div className="l">Solicitantes</div></div>
+        <div className="stat"><div className="n" style={{ color: '#34B27A' }}>{online.length}</div><div className="l">Online agora</div></div>
+        <div className="stat"><div className="n">{attToday}</div><div className="l">Atendimentos hoje</div></div>
+      </div>
+
+      <div className="grid grid-2 mb">
+        {/* técnicos online */}
+        <div className="card card-pad">
+          <h3>Técnicos online</h3>
+          <p className="muted small">Ativos nos últimos 5 minutos.</p>
+          <div className="col" style={{ gap: 10 }}>
+            {tecnicos.map((m) => {
+              const on = isOnline(group.id, m.userId);
+              const seen = lastSeen(group.id, m.userId);
+              return (
+                <div key={m.userId} className="row" style={{ gap: 10 }}>
+                  <span style={{ position: 'relative' }}>
+                    <Avatar name={m.user.name} size="sm" />
+                    <span className={`presence-dot ${on ? 'on' : ''}`} />
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <b className="small">{m.user.name}</b>
+                    <div className="t-meta">
+                      {on ? 'online agora' : seen ? `visto ${timeAgo(seen)}` : 'nunca acessou'}
+                    </div>
+                  </div>
+                  <RoleBadge role={m.role} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* categorias e seus membros */}
+        <div className="card card-pad">
+          <h3>Categorias e membros</h3>
+          <p className="muted small">Quem atende cada área de desenvolvimento.</p>
+          <div className="col" style={{ gap: 12 }}>
+            {categories.length === 0 && <Empty>Nenhuma categoria criada.</Empty>}
+            {categories.map((c) => {
+              const mems = membersOfCategory(c.id);
+              return (
+                <div key={c.id}>
+                  <div className="row" style={{ gap: 8 }}>
+                    <span className="dot" style={{ background: c.color, width: 10, height: 10 }} />
+                    <b className="small">{c.name}</b>
+                    <span className="muted small">· {mems.length} membro(s)</span>
+                  </div>
+                  <div className="row wrap" style={{ gap: 6, marginTop: 6, paddingLeft: 18 }}>
+                    {mems.length === 0
+                      ? <span className="muted small">Ninguém atende esta categoria.</span>
+                      : mems.map((m) => (
+                        <span key={m.userId} className="chip">
+                          {isOnline(group.id, m.userId) ? '🟢 ' : ''}{m.user.name}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              );
+            })}
+            {uncategorized.length > 0 && (
+              <div>
+                <b className="small muted">Devs sem categoria</b>
+                <div className="row wrap" style={{ gap: 6, marginTop: 6 }}>
+                  {uncategorized.map((m) => <span key={m.userId} className="chip">{m.user.name}</span>)}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* carga ativa por técnico */}
+      <div className="card card-pad">
+        <h3>Carga ativa por técnico</h3>
+        <p className="muted small">Chamados em aberto atribuídos a cada um.</p>
+        {load.every((d) => d.value === 0)
+          ? <Empty>Nenhum chamado ativo atribuído.</Empty>
+          : <ColumnChart data={load} height={160} color="#7A74C9" />}
+      </div>
     </div>
   );
 }
@@ -213,6 +328,7 @@ function PermissionsBlock({ group, user, bump }) {
 function MemberModal({ member, group, actor, onClose, bump }) {
   const isOwner = member.userId === group.ownerId;
   const isRequesterMember = member.role === 'solicitante';
+  const actorIsSuporte = actor.role === 'suporte'; // dev só altera papel (v0.0.6)
   const cities = cityList(group.id);
   const [form, setForm] = useState({
     name: member.user.name, email: member.user.email || '',
@@ -231,9 +347,10 @@ function MemberModal({ member, group, actor, onClose, bump }) {
   const save = () => {
     setError('');
     try {
-      adminUpdateUser(group.id, member.userId, form, actor);
-      if (!isRequesterMember && role !== member.role) setMemberRole(group.id, member.userId, role, actor);
-      if (!isRequesterMember && manager !== !!member.isManager) setMemberManager(group.id, member.userId, manager, actor);
+      if (actorIsSuporte) adminUpdateUser(group.id, member.userId, form, actor);
+      if (role !== member.role) setMemberRole(group.id, member.userId, role, actor);
+      if (actorIsSuporte && role !== 'solicitante' && manager !== !!member.isManager)
+        setMemberManager(group.id, member.userId, manager, actor);
       bump();
     } catch (err) { setError(err.message); }
   };
@@ -247,7 +364,9 @@ function MemberModal({ member, group, actor, onClose, bump }) {
     <>
       <Modal title="Perfil do membro" onClose={onClose}
         footer={<>
-          <button className="btn-danger" onClick={() => setConfirmRemove(true)} disabled={isOwner}>Remover do grupo</button>
+          {actorIsSuporte && (
+            <button className="btn-danger" onClick={() => setConfirmRemove(true)} disabled={isOwner}>Remover do grupo</button>
+          )}
           <span style={{ flex: 1 }} />
           <button onClick={onClose}>Cancelar</button>
           <button className="btn-primary" onClick={save}>Salvar</button>
@@ -280,48 +399,55 @@ function MemberModal({ member, group, actor, onClose, bump }) {
           )}
         </div>
 
-        <div className="field"><label>Nome</label><input value={form.name} onChange={set('name')} /></div>
-        <div className="row" style={{ gap: 10 }}>
-          <div className="field" style={{ flex: 1 }}><label>E-mail</label><input value={form.email} onChange={set('email')} /></div>
-          <div className="field" style={{ flex: 1 }}>
-            <label>Nova senha</label>
-            <input type="password" value={form.password} onChange={set('password')} placeholder="Deixe vazio p/ manter" />
-          </div>
-        </div>
-
-        {isRequesterMember && (
-          <div className="field">
-            <label>Cidade</label>
-            {cities.length ? (
-              <select value={form.cidade} onChange={set('cidade')}>
-                <option value="">— Sem cidade —</option>
-                {cities.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-              </select>
-            ) : (
-              <input value={form.cidade} onChange={set('cidade')} />
-            )}
-          </div>
-        )}
-
-        {!isRequesterMember && (
+        {actorIsSuporte ? (
           <>
-            <div className="divider" />
-            <div className="row wrap" style={{ gap: 14 }}>
-              <div className="field" style={{ flex: 1, minWidth: 160, marginBottom: 0 }}>
-                <label>Papel no grupo</label>
-                <select value={role} onChange={(e) => setRole(e.target.value)} disabled={isOwner}>
-                  <option value="suporte">Suporte</option>
-                  <option value="dev">Desenvolvedor</option>
-                </select>
-                {isOwner && <div className="hint">O dono do grupo é sempre suporte.</div>}
+            <div className="field"><label>Nome</label><input value={form.name} onChange={set('name')} /></div>
+            <div className="row" style={{ gap: 10 }}>
+              <div className="field" style={{ flex: 1 }}><label>E-mail</label><input value={form.email} onChange={set('email')} /></div>
+              <div className="field" style={{ flex: 1 }}>
+                <label>Nova senha</label>
+                <input type="password" value={form.password} onChange={set('password')} placeholder="Deixe vazio p/ manter" />
               </div>
-              <label className="row" style={{ gap: 8, marginBottom: 0, textTransform: 'none', fontSize: 13.5, fontWeight: 500 }}>
-                <input type="checkbox" style={{ width: 'auto' }} checked={manager} onChange={(e) => setManager(e.target.checked)} />
-                ⭐ Gerente (pode atribuir chamados)
-              </label>
             </div>
+
+            {isRequesterMember && (
+              <div className="field">
+                <label>Cidade</label>
+                {cities.length ? (
+                  <select value={form.cidade} onChange={set('cidade')}>
+                    <option value="">— Sem cidade —</option>
+                    {cities.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  </select>
+                ) : (
+                  <input value={form.cidade} onChange={set('cidade')} />
+                )}
+              </div>
+            )}
           </>
+        ) : (
+          <p className="muted small">Como desenvolvedor, você pode alterar o <b>papel</b> deste membro. A edição do perfil é exclusiva do suporte.</p>
         )}
+
+        <div className="divider" />
+        <div className="row wrap" style={{ gap: 14 }}>
+          <div className="field" style={{ flex: 1, minWidth: 180, marginBottom: 0 }}>
+            <label>Papel no grupo</label>
+            <select value={role} onChange={(e) => setRole(e.target.value)} disabled={isOwner}>
+              <option value="solicitante">Solicitante</option>
+              <option value="dev">Desenvolvedor</option>
+              <option value="suporte">Suporte</option>
+            </select>
+            {isOwner
+              ? <div className="hint">O dono do grupo é sempre suporte.</div>
+              : <div className="hint">Todo mundo entra como solicitante; aqui a equipe promove o acesso.</div>}
+          </div>
+          {actorIsSuporte && role !== 'solicitante' && (
+            <label className="row" style={{ gap: 8, marginBottom: 0, textTransform: 'none', fontSize: 13.5, fontWeight: 500 }}>
+              <input type="checkbox" style={{ width: 'auto' }} checked={manager} onChange={(e) => setManager(e.target.checked)} />
+              ⭐ Gerente (pode atribuir chamados)
+            </label>
+          )}
+        </div>
       </Modal>
 
       {confirmRemove && (
@@ -413,36 +539,28 @@ function Settings({ group, user, isSuporte, bump, onExit }) {
         </div>
       </div>
 
-      {/* códigos de acesso */}
-      <div className="grid grid-2 mb">
-        <div className="card card-pad">
-          <h3>👨‍💻 Código de técnicos</h3>
-          <p className="muted small">Suporte e devs entram no grupo com este código.</p>
-          <div className="row wrap" style={{ gap: 8 }}>
-            <span className="code-box">{group.techInviteCode}</span>
-            <button className="btn-sm" onClick={() => copy(group.techInviteCode)}>Copiar</button>
-            <button className="btn-sm" title="Gerar novo" onClick={() => { regenerateCode(group.id, 'tech', user); bump(); }}>↺</button>
-          </div>
-        </div>
-        <div className="card card-pad">
-          <h3>🙋 Código de solicitantes</h3>
-          <p className="muted small">Obrigatório no cadastro do solicitante — sem ele, a conta não é criada.</p>
-          <div className="row wrap" style={{ gap: 8 }}>
-            <span className="code-box">{group.requesterCode}</span>
-            <button className="btn-sm" onClick={() => copy(group.requesterCode)}>Copiar</button>
-            <button className="btn-sm" title="Gerar novo" onClick={() => { regenerateCode(group.id, 'requester', user); bump(); }}>↺</button>
-          </div>
+      {/* código ÚNICO de acesso (v0.0.6) */}
+      <div className="card card-pad mb">
+        <h3>Código de acesso do grupo</h3>
+        <p className="muted small">
+          Um único código para todos: quem entra com ele vira <b>solicitante</b> (informando a cidade).
+          Depois, a equipe define quem passa a ser desenvolvedor ou suporte.
+        </p>
+        <div className="row wrap" style={{ gap: 8 }}>
+          <span className="code-box">{groupAccessCode(group)}</span>
+          <button className="btn-sm" onClick={() => copy(groupAccessCode(group))}>Copiar</button>
+          <button className="btn-sm" title="Gerar novo (invalida o anterior)" onClick={() => { regenerateCode(group.id, user); bump(); }}>↺ Gerar novo</button>
         </div>
       </div>
 
       {/* convites */}
       <div className="card card-pad mb">
-        <h3>✉️ Convidar técnico</h3>
-        <p className="muted small">O convidado aceita ou recusa na página de Convites.</p>
+        <h3>Convidar</h3>
+        <p className="muted small">O convidado aceita ou recusa na página de Convites e entra como solicitante.</p>
         {inviteMsg && <div className="alert alert-info">{inviteMsg}</div>}
         <form className="row wrap" onSubmit={sendInvite} style={{ gap: 8 }}>
           <input value={inviteLogin} onChange={(e) => setInviteLogin(e.target.value)}
-            placeholder="login ou e-mail do técnico" style={{ flex: 1, minWidth: 200 }} />
+            placeholder="login ou e-mail de quem você quer convidar" style={{ flex: 1, minWidth: 200 }} />
           <button className="btn-primary">Convidar</button>
         </form>
 

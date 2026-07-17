@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   can, isTech, invitationsForUser, unreadNotifications,
-  internalUnreadTotal, unassignedTickets,
+  internalUnreadTotal, unassignedTickets, touchPresence,
 } from '../lib/domain';
 import { getTheme, toggleTheme } from '../lib/theme';
 import { Avatar, RoleBadge } from './ui';
@@ -15,6 +15,14 @@ export default function Layout({ children }) {
   const [openMenu, setOpenMenu] = useState(null);   // chave do dropdown aberto
   const [mobileOpen, setMobileOpen] = useState(false);
   const [theme, setThemeState] = useState(getTheme());
+
+  // presença online: marca atividade ao navegar e a cada minuto (v0.0.6)
+  useEffect(() => {
+    touchPresence(activeGroup.id, user.id);
+    const iv = setInterval(() => touchPresence(activeGroup.id, user.id), 60_000);
+    return () => clearInterval(iv);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeGroup.id, user.id, location.pathname]);
 
   const role = user.role;
   const tech = isTech(role);

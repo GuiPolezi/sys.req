@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   ticketsVisibleTo, categoriesForGroup, teamLoad, ticketsAwaitingReview, isTech,
   getDashPrefs, saveDashPrefs, dashWidgetsFor, slaInfo, SLA_STATUS,
+  systemsForGroup, attendancesForGroup,
   STATUS, URGENCY,
 } from '../lib/domain';
 import { db } from '../lib/store';
@@ -81,6 +82,50 @@ export default function Dashboard() {
     if (info) acc[info.status] = (acc[info.status] || 0) + 1;
     return acc;
   }, {}) : {};
+
+  // ---- widgets novos (v0.0.6) ----
+  // por sistema
+  const systems = systemsForGroup(activeGroup.id);
+  const sysItems = [
+    ...systems.map((s) => ({ key: s.id, label: s.name, color: 'var(--primary)', value: tickets.filter((t) => t.systemId === s.id).length })),
+    { key: 'none', label: 'Sem sistema', color: 'var(--muted)', value: tickets.filter((t) => !t.systemId).length },
+  ].filter((i) => i.value > 0).sort((a, b) => b.value - a.value);
+
+  // por cidade
+  const cityMap = {};
+  tickets.forEach((t) => { const c = t.cidade || 'Sem cidade'; cityMap[c] = (cityMap[c] || 0) + 1; });
+  const cityItems = Object.entries(cityMap)
+    .map(([label, value]) => ({ key: label, label, color: '#2FA8A8', value }))
+    .sort((a, b) => b.value - a.value).slice(0, 8);
+
+  // tempo médio de resolução (concluídos)
+  const doneWithTime = done.map((t) => (new Date(t.updatedAt) - new Date(t.createdAt)) / 3600_000);
+  const avgHours = doneWithTime.length ? doneWithTime.reduce((s, h) => s + h, 0) / doneWithTime.length : 0;
+  const fmtH = (h) => (h >= 48 ? `${(h / 24).toFixed(1)} dias` : `${h.toFixed(1)}h`);
+  const avgByUrgency = Object.entries(URGENCY).map(([k, v]) => {
+    const list = done.filter((t) => t.urgency === k).map((t) => (new Date(t.updatedAt) - new Date(t.createdAt)) / 3600_000);
+    const avg = list.length ? list.reduce((s, h) => s + h, 0) / list.length : 0;
+    return { key: k, label: v.label, color: v.color, value: Math.round(avg * 10) / 10 };
+  });
+
+  // análises pendentes (solicitante + técnica)
+  const pendingReview = tickets.filter((t) => t.status === 'em_analise');
+  const pendingTech = tickets.filter((t) => t.techReview?.status === 'pendente');
+
+  // atendimentos dos últimos 7 dias (suporte)
+  const att7 = [];
+  if (user.role === 'suporte') {
+    const all = attendancesForGroup(activeGroup.id);
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+      const key = ymd(d);
+      att7.push({
+        label: d.toLocaleDateString('pt-BR', { weekday: 'short' }).slice(0, 3),
+        full: d.toLocaleDateString('pt-BR'),
+        value: all.filter((a) => a.at.slice(0, 10) === key).length,
+      });
+    }
+  }
 
   return (
     <div>
@@ -180,6 +225,72 @@ export default function Dashboard() {
         </div>
         )}
       </div>
+      )}
+
+      {/* por sistema / por cidade (v0.0.6) */}
+      {(show('sistemas') || (tech && show('cidades'))) && (
+        <div className="grid grid-2 mb">
+          {show('sistemas') && (
+            <div className="card card-pad">
+              <h3>Chamados por sistema</h3>
+              <div style={{ marginTop: 10 }}>
+                <BarList items={sysItems} empty="Nenhum chamado com sistema." />
+              </div>
+            </div>
+          )}
+          {tech && show('cidades') && (
+            <div className="card card-pad">
+              <h3>Chamados por cidade</h3>
+              <div style={{ marginTop: 10 }}>
+                <BarList items={cityItems} empty="Nenhum chamado." />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* tempo médio de resolução / análises pendentes (v0.0.6) */}
+      {tech && (show('tempo') || show('analises')) && (
+        <div className="grid grid-2 mb">
+          {show('tempo') && (
+            <div className="card card-pad">
+              <h3>Tempo médio de resolução</h3>
+              <div className="row" style={{ gap: 16, marginTop: 10, alignItems: 'baseline' }}>
+                <span style={{ fontSize: 34, fontWeight: 200 }}>{done.length ? fmtH(avgHours) : '—'}</span>
+                <span className="muted small">média geral · {done.length} concluído(s)</span>
+              </div>
+              <div className="divider" />
+              <div className="muted small mb">Por urgência (horas):</div>
+              <BarList items={avgByUrgency} empty="Nenhum chamado concluído." />
+            </div>
+          )}
+          {show('analises') && (
+            <div className="card card-pad">
+              <h3>Análises pendentes</h3>
+              <div className="stats" style={{ marginTop: 10 }}>
+                <div className="stat"><div className="n" style={{ color: '#7A74C9' }}>{pendingReview.length}</div><div className="l">Aguardando solicitante</div></div>
+                <div className="stat"><div className="n" style={{ color: '#7A74C9' }}>{pendingTech.length}</div><div className="l">Análise técnica</div></div>
+              </div>
+              <div className="col mt" style={{ gap: 4 }}>
+                {[...pendingReview, ...pendingTech].slice(0, 5).map((t) => (
+                  <a key={t.id} className="small" style={{ cursor: 'pointer' }} onClick={() => navigate(`/tickets/${t.id}`)}>
+                    #{t.number || ''} · {t.title}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* atendimentos — últimos 7 dias (suporte) */}
+      {user.role === 'suporte' && show('atendimentos') && (
+        <div className="card card-pad mb">
+          <h3>Atendimentos — últimos 7 dias</h3>
+          <div style={{ marginTop: 12 }}>
+            <ColumnChart data={att7} height={150} color="#2FA8A8" />
+          </div>
+        </div>
       )}
 
       {/* situação de SLA (v0.0.5) */}

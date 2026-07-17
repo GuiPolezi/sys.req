@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { createGroup, joinGroupByCode, isTech, invitationsForUser } from '../lib/domain';
+import { createGroup, joinGroupByCode, isTech, invitationsForUser, groupForCode, cityList } from '../lib/domain';
 import { getTheme, toggleTheme } from '../lib/theme';
 import { Avatar } from '../components/ui';
 
@@ -51,7 +51,11 @@ export default function GroupGate({ children }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [code, setCode] = useState('');
+  const [cidade, setCidade] = useState(user?.cidade || '');
   const [error, setError] = useState('');
+
+  const match = groupForCode(code);
+  const joinCities = match ? cityList(match.group.id) : [];
 
   // páginas acessíveis sem grupo (perfil, convites)
   if (children) return <NoGroupShell>{children}</NoGroupShell>;
@@ -72,7 +76,7 @@ export default function GroupGate({ children }) {
     e.preventDefault();
     setError('');
     try {
-      const g = joinGroupByCode(user, code);
+      const g = joinGroupByCode(user, code, cidade);
       refresh();
       selectGroup(g.id);
     } catch (err) { setError(err.message); }
@@ -117,10 +121,27 @@ export default function GroupGate({ children }) {
             ) : canCreate ? (
               <form onSubmit={doJoin}>
                 <div className="field">
-                  <label>Código de convite da equipe</label>
+                  <label>Código de acesso do grupo</label>
                   <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Ex.: A1B2C3" autoFocus required />
-                  <div className="hint">Peça ao suporte do grupo o código de convite de técnicos.</div>
+                  {match ? (
+                    <div className="hint">✓ Grupo <b>{match.group.name}</b> — você entra como solicitante; a equipe pode promover depois.</div>
+                  ) : (
+                    <div className="hint">Peça o código de acesso à equipe do grupo.</div>
+                  )}
                 </div>
+                {match && (
+                  <div className="field">
+                    <label>Sua cidade *</label>
+                    {joinCities.length ? (
+                      <select value={cidade} onChange={(e) => setCidade(e.target.value)} required>
+                        <option value="">Selecione sua cidade</option>
+                        {joinCities.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+                      </select>
+                    ) : (
+                      <input value={cidade} onChange={(e) => setCidade(e.target.value)} required placeholder="Sua cidade" />
+                    )}
+                  </div>
+                )}
                 <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>Entrar no grupo</button>
               </form>
             ) : null}

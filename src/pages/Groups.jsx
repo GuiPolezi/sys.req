@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { createGroup, joinGroupByCode, isTech, groupMembers } from '../lib/domain';
+import { createGroup, joinGroupByCode, isTech, groupMembers, groupForCode, cityList } from '../lib/domain';
 import { Modal, Empty } from '../components/ui';
 
 // Página de grupos: alternar entre grupos, criar novo, entrar por código.
@@ -11,11 +11,15 @@ export default function Groups() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [code, setCode] = useState('');
+  const [cidade, setCidade] = useState(user?.cidade || '');
   const [error, setError] = useState('');
   const bump = () => { refresh(); setLocal((n) => n + 1); };
   const tech = isTech(user.role);
 
-  const open = (which) => { setError(''); setName(''); setDescription(''); setCode(''); setModal(which); };
+  const match = groupForCode(code);
+  const joinCities = match ? cityList(match.group.id) : [];
+
+  const open = (which) => { setError(''); setName(''); setDescription(''); setCode(''); setCidade(user?.cidade || ''); setModal(which); };
 
   const doCreate = () => {
     setError('');
@@ -24,7 +28,7 @@ export default function Groups() {
   };
   const doJoin = () => {
     setError('');
-    try { const g = joinGroupByCode(user, code); bump(); selectGroup(g.id); setModal(null); }
+    try { const g = joinGroupByCode(user, code, cidade); bump(); selectGroup(g.id); setModal(null); }
     catch (err) { setError(err.message); }
   };
 
@@ -84,7 +88,28 @@ export default function Groups() {
         <Modal title="Entrar em um grupo" onClose={() => setModal(null)}
           footer={<><button onClick={() => setModal(null)}>Cancelar</button><button className="btn-primary" onClick={doJoin}>Entrar</button></>}>
           {error && <div className="alert alert-error">{error}</div>}
-          <div className="field"><label>Código de convite da equipe</label><input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Ex.: A1B2C3" autoFocus /><div className="hint">Peça ao suporte do grupo o código de convite de técnicos.</div></div>
+          <div className="field">
+            <label>Código de acesso do grupo</label>
+            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Ex.: A1B2C3" autoFocus />
+            {match ? (
+              <div className="hint">✓ Grupo <b>{match.group.name}</b> — você entra como solicitante; a equipe pode promover depois.</div>
+            ) : (
+              <div className="hint">Peça o código de acesso à equipe do grupo.</div>
+            )}
+          </div>
+          {match && (
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Sua cidade *</label>
+              {joinCities.length ? (
+                <select value={cidade} onChange={(e) => setCidade(e.target.value)}>
+                  <option value="">Selecione sua cidade</option>
+                  {joinCities.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+                </select>
+              ) : (
+                <input value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Sua cidade" />
+              )}
+            </div>
+          )}
         </Modal>
       )}
     </div>

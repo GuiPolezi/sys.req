@@ -1,0 +1,36 @@
+Help-desk-0-0-5 Base tests
+
+Testes básicos da nova versão
+
+
+suporte
+------------
+dongui
+gui123
+-------------
+solicitante
+guisol
+gui123
+--------------
+desenvolvedor
+guidev
+gui123
+
+
+
+Cadastro - Não tem mais escolha de ser suporte, dev ou solicitante.
+{ Observações: Como agora o cadastro é único, só cria o usuário, acho que podemos remover na página equipe - configurações - a opção Código de Técnicos e Código de solicitantes. Corrija isso, no cadastro podemos inserir um código para acessar o grupo, mas qual código deve ser? Formate essa etapa. Também mude o nome de convidar técnico para apenas convidar.}
+
+
+Painel - Podemos personalizar o nosso dashboard.
+# Criar mais gráficos, novas informações, para adicionar nas seleções de personalização do painel. Para deixar o painel muito personalizável.
+
+- Modificar Grupos:
+Todo usuário que acessar um grupo deve entrar como solicitante. O dono do grupo, ou os técnicos (suporte e dev) que devem poder escolher se o usuário sera desenvolvedor, suporte, ou mantém como solicitante.
+Quando o usuário for entrar no grupo, ele estará como solicitante, então antes dele entrar de fato, deve-se aparecer um campo para ele preencher a qual cidade ele pertence (deve ser um campo selecionável com as cidades que estão cadastradas no sistema)
+
+Modificação na página de equipes.
+
+- Em equipes, deve-se ter uma página de dashboard para visualizarmos algumas informações da equipe; Quero conseguir visualizar a categoria e seus respectivos membros. Quero visualizar os usuários (técnicos) que estão online. Adicione mais informações se for possível, conforme o sistema
+
+Temos diversos problemas com Chamados e Fluxos.

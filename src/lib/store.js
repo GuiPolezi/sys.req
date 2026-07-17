@@ -27,6 +27,7 @@ const COLLECTIONS = [
   'notifications', // avisos por usuário
   'chatReads',     // leitura por canal do chat interno (inclui DMs)
   'prefs',         // preferências por usuário (ex.: widgets do painel)
+  'presence',      // último acesso por usuário/grupo (técnicos online)
   'auditLog',      // log de auditoria por grupo
 ];
 

@@ -144,38 +144,50 @@ export function createUser({ name, login, email, password, cidade }) {
   return db.insert('users', user);
 }
 
-// Identifica o grupo (e o tipo de acesso) de um código digitado.
+// v0.0.6 — o grupo tem UM único código de acesso. Quem entra por ele
+// entra sempre como SOLICITANTE (informando a cidade); os técnicos do
+// grupo promovem depois para dev/suporte, se for o caso.
+export function groupAccessCode(group) {
+  // compatível com grupos antigos (que tinham dois códigos)
+  return group.accessCode || group.techInviteCode || group.requesterCode;
+}
+
+// Identifica o grupo de um código digitado (aceita códigos legados).
 export function groupForCode(code) {
   const c = (code || '').trim().toUpperCase();
   if (!c) return null;
-  const group = db.find('groups', (g) => g.requesterCode === c || g.techInviteCode === c);
-  if (!group) return null;
-  return { group, kind: group.requesterCode === c ? 'solicitante' : 'tecnico' };
+  const group = db.find(
+    'groups',
+    (g) => g.accessCode === c || g.requesterCode === c || g.techInviteCode === c
+  );
+  return group ? { group } : null;
+}
+
+// Vincula um usuário a um grupo como SOLICITANTE (entrada padrão).
+function joinAsRequester(group, user, cidade) {
+  const city = (cidade || user.cidade || '').trim();
+  if (!city) throw new Error('Informe a sua cidade para entrar no grupo.');
+  if (!user.cidade) db.update('users', user.id, { cidade: city });
+  const members = [...group.members, { userId: user.id, role: 'solicitante', categoryIds: [], joinedAt: nowISO() }];
+  db.update('groups', group.id, { members });
+  logAudit(group.id, user.id, 'membro.entrou', `${user.name} entrou como solicitante (${city}).`);
 }
 
 // Cadastro ATÔMICO: valida TUDO antes de gravar qualquer coisa.
-// - código de solicitante → entra no grupo como solicitante (cidade obrigatória)
-// - código de técnico     → entra no grupo como dev (o suporte pode promover depois)
-// - sem código            → conta criada; cria ou entra num grupo depois
+// - com código → entra no grupo como solicitante (cidade obrigatória)
+// - sem código → conta criada; cria ou entra num grupo depois
 export function registerUser(data, code) {
   const c = (code || '').trim();
   let match = null;
   if (c) {
     match = groupForCode(c);
     if (!match) throw new Error('Código inválido.');
-    if (match.kind === 'solicitante' && !(data.cidade || '').trim())
-      throw new Error('Para entrar como solicitante, informe a cidade.');
+    if (!(data.cidade || '').trim())
+      throw new Error('Informe a sua cidade para entrar no grupo.');
   }
 
   const user = createUser(data);
-
-  if (match) {
-    const role = match.kind === 'solicitante' ? 'solicitante' : 'dev';
-    const members = [...match.group.members, { userId: user.id, role, categoryIds: [], joinedAt: nowISO() }];
-    db.update('groups', match.group.id, { members });
-    logAudit(match.group.id, user.id, 'membro.entrou',
-      `${user.name} cadastrou-se com código de ${match.kind === 'solicitante' ? 'solicitante' : 'técnico'}.`);
-  }
+  if (match) joinAsRequester(match.group, user, data.cidade);
   return user;
 }
 
@@ -201,8 +213,7 @@ export function createGroup({ name, description }, ownerUser) {
     ownerId: ownerUser.id,
     // quem cria o grupo é o suporte dele (papel é por grupo desde a v0.0.5)
     members: [{ userId: ownerUser.id, role: 'suporte', categoryIds: [], joinedAt: nowISO() }],
-    techInviteCode: shortCode(),
-    requesterCode: shortCode(),
+    accessCode: shortCode(), // código ÚNICO de acesso (v0.0.6)
     createdAt: nowISO(),
   };
   db.insert('groups', group);
@@ -230,20 +241,14 @@ export function groupMembers(group) {
     .filter((m) => m.user);
 }
 
-// O código usado define o papel no grupo: requester → solicitante, tech → dev.
-export function joinGroupByCode(user, code) {
+// Entrada por código: SEMPRE como solicitante, informando a cidade (v0.0.6).
+export function joinGroupByCode(user, code, cidade = '') {
   const match = groupForCode(code);
   if (!match) throw new Error('Código inválido.');
-  const { group, kind } = match;
-  const role = kind === 'solicitante' ? 'solicitante' : 'dev';
-  if (role === 'solicitante' && !(user.cidade || '').trim())
-    throw new Error('Para entrar como solicitante, defina sua cidade no perfil primeiro.');
-
+  const { group } = match;
   if (membership(group, user.id)) return group;
-  const members = [...group.members, { userId: user.id, role, categoryIds: [], joinedAt: nowISO() }];
-  const updated = db.update('groups', group.id, { members });
-  logAudit(group.id, user.id, 'membro.entrou', `${user.name} entrou via código (${role}).`);
-  return updated;
+  joinAsRequester(group, user, cidade);
+  return db.byId('groups', group.id);
 }
 
 // ------------------------------------------------------------
@@ -267,13 +272,18 @@ function assertSuporte(groupId, actor, message) {
   if (roleInGroup(groupId, actor.id, actor.role) !== 'suporte') throw new Error(message);
 }
 
-// Suporte define se o técnico é suporte ou dev (RP da v0.0.5)
+// v0.0.6 — os TÉCNICOS do grupo (suporte e dev) definem o papel de cada membro:
+// solicitante (padrão de entrada), desenvolvedor ou suporte.
 export function setMemberRole(groupId, userId, role, actor) {
-  assertSuporte(groupId, actor, 'Apenas o suporte pode alterar papéis.');
+  if (!['solicitante', 'dev', 'suporte'].includes(role)) throw new Error('Papel inválido.');
+  if (!isTech(roleInGroup(groupId, actor.id, actor.role)))
+    throw new Error('Apenas técnicos do grupo podem alterar papéis.');
   const group = db.byId('groups', groupId);
   if (group.ownerId === userId && role !== 'suporte')
     throw new Error('O dono do grupo precisa continuar como suporte.');
-  const g = patchMember(groupId, userId, { role });
+  // ao virar solicitante, perde gerência e categorias
+  const patch = role === 'solicitante' ? { role, isManager: false, categoryIds: [] } : { role };
+  const g = patchMember(groupId, userId, patch);
   const who = db.byId('users', userId)?.name || '?';
   logAudit(groupId, actor.id, 'membro.papel', `${who} agora é ${ROLES[role]?.label || role}.`);
   return g;
@@ -399,10 +409,10 @@ export function deleteGroup(groupId, actor) {
   db.remove('groups', groupId);
 }
 
-export function regenerateCode(groupId, which, actor) {
-  const patch = which === 'tech' ? { techInviteCode: shortCode() } : { requesterCode: shortCode() };
-  const g = db.update('groups', groupId, patch);
-  logAudit(groupId, actor?.id, 'grupo.codigo', `Novo código (${which}) gerado.`);
+export function regenerateCode(groupId, actor) {
+  // invalida também códigos legados
+  const g = db.update('groups', groupId, { accessCode: shortCode(), techInviteCode: null, requesterCode: null });
+  logAudit(groupId, actor?.id, 'grupo.codigo', 'Novo código de acesso gerado.');
   return g;
 }
 
@@ -449,17 +459,14 @@ export function invitationsForGroup(groupId) {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export function respondInvitation(inviteId, accept) {
+export function respondInvitation(inviteId, accept, cidade = '') {
   const invite = db.byId('invitations', inviteId);
   if (!invite || invite.status !== 'pendente') throw new Error('Convite indisponível.');
   const user = db.byId('users', invite.inviteeId);
   if (accept) {
     const group = db.byId('groups', invite.groupId);
-    if (!membership(group, user.id)) {
-      // convidado entra como dev; o suporte pode promover depois (v0.0.5)
-      const members = [...group.members, { userId: user.id, role: 'dev', categoryIds: [], joinedAt: nowISO() }];
-      db.update('groups', group.id, { members });
-    }
+    // v0.0.6 — todo mundo entra como solicitante (com cidade); técnicos promovem depois
+    if (!membership(group, user.id)) joinAsRequester(group, user, cidade);
     logAudit(invite.groupId, user.id, 'convite.aceito', `${user.name} aceitou o convite.`);
   } else {
     logAudit(invite.groupId, user.id, 'convite.recusado', `${user.name} recusou o convite.`);
@@ -1304,27 +1311,57 @@ export function internalUnreadTotal(group, user) {
 }
 
 // ------------------------------------------------------------
-//  PREFERÊNCIAS DO PAINEL (v0.0.5) — widgets escolhidos pelo usuário
+//  PRESENÇA (v0.0.6) — técnicos online (último acesso por grupo)
 // ------------------------------------------------------------
-// Widgets disponíveis por perfil (solicitante tem um conjunto próprio)
+const ONLINE_WINDOW_MS = 5 * 60_000; // considerado online por 5 min
+
+export function touchPresence(groupId, userId) {
+  const rec = db.find('presence', (p) => p.groupId === groupId && p.userId === userId);
+  if (rec) return db.update('presence', rec.id, { at: nowISO() });
+  return db.insert('presence', { id: uid('prs'), groupId, userId, at: nowISO() });
+}
+
+export function lastSeen(groupId, userId) {
+  return db.find('presence', (p) => p.groupId === groupId && p.userId === userId)?.at || null;
+}
+
+export function isOnline(groupId, userId) {
+  const at = lastSeen(groupId, userId);
+  return !!at && Date.now() - new Date(at).getTime() < ONLINE_WINDOW_MS;
+}
+
+// ------------------------------------------------------------
+//  PREFERÊNCIAS DO PAINEL — widgets escolhidos pelo usuário
+// ------------------------------------------------------------
 export const DASH_WIDGETS_TECH = [
   { key: 'kpis', label: 'Indicadores (KPIs)' },
   { key: 'serie', label: 'Chamados criados (linha do tempo)' },
   { key: 'status', label: 'Distribuição por status' },
   { key: 'urgencia', label: 'Por urgência e categoria' },
+  { key: 'sistemas', label: 'Chamados por sistema' },
+  { key: 'cidades', label: 'Chamados por cidade' },
+  { key: 'tempo', label: 'Tempo médio de resolução' },
+  { key: 'analises', label: 'Análises pendentes' },
   { key: 'equipe', label: 'Carga da equipe' },
   { key: 'sla', label: 'Situação de SLA' },
   { key: 'recentes', label: 'Atividade recente' },
+];
+export const DASH_WIDGETS_SUPORTE = [
+  ...DASH_WIDGETS_TECH,
+  { key: 'atendimentos', label: 'Atendimentos (últimos 7 dias)' },
 ];
 export const DASH_WIDGETS_REQUESTER = [
   { key: 'kpis', label: 'Meus números' },
   { key: 'serie', label: 'Meus chamados (linha do tempo)' },
   { key: 'status', label: 'Distribuição por status' },
+  { key: 'sistemas', label: 'Por sistema' },
   { key: 'recentes', label: 'Atividade recente' },
 ];
 
 export function dashWidgetsFor(role) {
-  return role === 'solicitante' ? DASH_WIDGETS_REQUESTER : DASH_WIDGETS_TECH;
+  if (role === 'solicitante') return DASH_WIDGETS_REQUESTER;
+  if (role === 'suporte') return DASH_WIDGETS_SUPORTE;
+  return DASH_WIDGETS_TECH;
 }
 
 export function getDashPrefs(groupId, userId, role) {
