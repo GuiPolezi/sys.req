@@ -21,7 +21,7 @@ export default function Audit() {
   const log = auditForGroup(activeGroup.id);
 
   return (
-    <div style={{ maxWidth: 760 }}>
+    <div>
       <div className="page-head">
         <h1>📜 Log de auditoria</h1>
         <p className="muted">Toda movimentação registrada no grupo — {log.length} evento(s).</p>
