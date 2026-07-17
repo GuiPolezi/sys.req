@@ -17,7 +17,7 @@ export default function Invites() {
   };
 
   return (
-    <div style={{ maxWidth: 640 }}>
+    <div>
       <div className="page-head">
         <h1>Convites</h1>
         <p className="muted">Convites de grupos aguardando sua resposta.</p>
