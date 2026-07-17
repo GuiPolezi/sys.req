@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   createTicket, categoriesForGroup, servicesForSystem, systemsForGroup,
-  groupMembers, isTech, URGENCY, TICKET_TYPES,
+  groupMembers, isTech, cityList, registerAttendance, URGENCY, TICKET_TYPES,
 } from '../lib/domain';
+import { stripHtml } from '../components/ui';
 import { db } from '../lib/store';
 import RichText from '../components/RichText';
 
@@ -27,6 +28,9 @@ export default function NewTicket() {
   const [reqMode, setReqMode] = useState(requesters.length ? 'registered' : 'other');
   const [requesterId, setRequesterId] = useState(requesters[0]?.userId || '');
   const [requesterName, setRequesterName] = useState('');
+  const [genAttendance, setGenAttendance] = useState(false); // suporte: gera atendimento junto
+  const cities = cityList(activeGroup.id);
+  const isSuporte = user.role === 'suporte';
 
   const [form, setForm] = useState({
     title: '', description: '', type: 'Solicitação',
@@ -81,6 +85,16 @@ export default function NewTicket() {
       }
     }
     const t = createTicket(activeGroup.id, data, user, serviceId || null);
+
+    // v0.0.5 — suporte pode gerar um atendimento automaticamente junto do chamado
+    if (isSuporte && genAttendance) {
+      registerAttendance(activeGroup.id, {
+        client: t.requesterName || 'Solicitante',
+        cidade: t.cidade || '',
+        note: `Chamado #${t.number} — ${t.title}. ${stripHtml(t.description).slice(0, 160)}`,
+      }, user);
+    }
+
     refresh();
     navigate(`/tickets/${t.id}`);
   };
@@ -233,15 +247,30 @@ export default function NewTicket() {
           </div>
           <div className="field" style={{ flex: 1 }}>
             <label>Cidade</label>
-            <input
-              value={effectiveCidade}
-              onChange={set('cidade')}
-              readOnly={user.role === 'solicitante' || (tech && reqMode === 'registered')}
-              placeholder="Cidade do solicitante"
-            />
+            {tech && reqMode === 'other' && cities.length ? (
+              <select value={form.cidade} onChange={set('cidade')}>
+                <option value="">— Selecione a cidade —</option>
+                {cities.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+            ) : (
+              <input
+                value={effectiveCidade}
+                onChange={set('cidade')}
+                readOnly={user.role === 'solicitante' || (tech && reqMode === 'registered')}
+                placeholder="Cidade do solicitante"
+              />
+            )}
             {user.role === 'solicitante' && <div className="hint">Vinculada ao seu cadastro.</div>}
           </div>
         </div>
+
+        {isSuporte && (
+          <label className="row" style={{ gap: 8, marginBottom: 14, textTransform: 'none', fontSize: 13.5, fontWeight: 500 }}>
+            <input type="checkbox" style={{ width: 'auto' }} checked={genAttendance}
+              onChange={(e) => setGenAttendance(e.target.checked)} />
+            Gerar registro de atendimento automaticamente para este chamado
+          </label>
+        )}
 
         {tech && (
           <div className="field">

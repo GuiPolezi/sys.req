@@ -1,4 +1,4 @@
-# HelpDesk — Documentação do Sistema (v0.0.3)
+# HelpDesk — Documentação do Sistema (v0.0.5)
 
 Documento único que explica **tudo o que foi desenvolvido até agora**: propósito, arquitetura,
 modelo de dados, funcionalidades, regras de negócio, telas, design e limitações.
@@ -46,7 +46,19 @@ O botão **"Recarregar dados demo"** na tela de login apaga tudo e repopula o se
 
 ## 2. Papéis e permissões
 
-O sistema tem **3 papéis**. Toda autorização vem de um objeto único (`can`) em `domain.js`,
+O sistema tem **3 papéis** — mas desde a **v0.0.5 o papel pertence à participação no grupo,
+não à conta**: o cadastro é único (nome, login, senha), e cada grupo define se a pessoa é
+suporte, dev ou solicitante ali. O código usado na entrada decide o papel inicial
+(código de solicitante → solicitante; código de técnico → dev) e o **suporte pode
+promover/rebaixar técnicos** (suporte ⇄ dev) e marcar **⭐ gerentes** na página Equipe.
+O `AuthContext` resolve o papel efetivo do grupo ativo, então todas as telas continuam
+consultando `user.role`.
+
+Além disso, o grupo tem **permissões configuráveis** (Equipe → Configurações): exclusão de
+chamados (bloqueada/suporte), alteração de urgência (responsável/suporte) e atribuição
+(suporte+gerentes/somente suporte).
+
+Toda autorização vem de um objeto único (`can` + helpers) em `domain.js`,
 usado tanto pela UI quanto pelas regras — nunca há regra duplicada.
 
 | Ação | Suporte | Desenvolvedor | Solicitante |
@@ -384,6 +396,8 @@ Assim o menu **nunca faz a página rolar**, mesmo em telas baixas. Há ainda um 
 | **v0.0.2 — rodada de testes 1** | Página de grupos; cidade só para solicitante; ranking com pódio e só solicitantes; atendimentos com calendário; membros em abas; chat com canais; abertura de chamado em 2 passos; editor rico; sistemas do grupo; atribuição de técnico; "atribuídos a mim"; permissões por responsável; chamado em nome de terceiros; stats do solicitante; dev sem acesso a atendimentos. |
 | **v0.0.2 — rodada de testes 2** | Dashboard profissional com gráficos; atividade recente por criação; cidade vazia no registro de atendimento; gráfico de área com filtro de período; redesenho do menu lateral e revisão da responsividade. |
 | **v0.0.3 — testes de produção** | **3 bugs corrigidos** (cadastro atômico, editor de texto invertido, texto vazando dos cards). Edição + confirmação de exclusão em categorias/sistemas/serviços; categoria lista seus sistemas; serviços por sistema com **atribuição balanceada por categoria**; abertura de chamado em 3 passos; aba **Configurações** na Equipe; **cadastro de clientes** e **atendimentos por técnico**; **notificações** com badges; **carga da equipe** no painel; contagem no pool; **encerramento** do chamado concluído (com reabertura pelo suporte). |
+| **v0.0.4 — redesign "Aero"** | Reformulação visual completa: Frutiger Aero (vidro/aqua), menubar macOS com dropdowns, tipografia fina, tema claro/escuro. Sem mudanças de lógica. |
+| **v0.0.5 — Sys.Req da equipe** | **Cadastro único** (papel definido por grupo; suporte configura suporte/dev na Equipe); **painel personalizável** por usuário (widgets); tickets com **nº sequencial** + filtros por nº/período/técnico; **conversas individuais (DM)**; **gestão de membros** (perfil, senha, papel, ⭐gerente, remoção); **relatórios CSV** em todos os cadastros; **atendimento automático** na criação do chamado; **cadastro de cidades** (campos viram seleção); **SLA** (config + acompanhamento + relatório); **workflows** com etapas → **subchamados** encadeados (pai bloqueado até filhos concluírem); **análise técnica** dev ⇄ suporte; **permissões configuráveis** (exclusão de chamado, urgência, atribuição); **gerentes** podem atribuir chamados do pool. |
 
 ### Bugs corrigidos na v0.0.3
 

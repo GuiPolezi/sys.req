@@ -7,7 +7,7 @@
 //  mantendo a mesma assinatura — o resto do app não muda.
 // =============================================================
 
-const NS = 'helpdesk_alpha_v2';
+const NS = 'helpdesk_alpha_v3';
 
 const COLLECTIONS = [
   'users',
@@ -17,13 +17,17 @@ const COLLECTIONS = [
   'tickets',
   'ticketMessages',
   'internalMessages',
-  'services',      // RCS04/07 — templates de criação de tickets
-  'invitations',   // RP02/RP06 — convites com aceite/recusa
-  'clients',       // cadastro de clientes (usado no registro de atendimentos)
-  'attendances',   // RCS12 — registro de atendimentos avulsos
-  'notifications', // avisos por usuário (mensagens, status, análise…)
-  'chatReads',     // marcador de leitura por canal do chat interno
-  'auditLog',      // RP16 — log de auditoria por grupo
+  'services',      // templates de criação de tickets
+  'invitations',   // convites com aceite/recusa
+  'clients',       // cadastro de clientes (registro de atendimentos)
+  'cities',        // cadastro de cidades do grupo (campos "cidade" viram seleção)
+  'slas',          // configurações de SLA (prazos por urgência/categoria)
+  'workflows',     // fluxos de trabalho (etapas que geram subtickets)
+  'attendances',   // registro de atendimentos avulsos
+  'notifications', // avisos por usuário
+  'chatReads',     // leitura por canal do chat interno (inclui DMs)
+  'prefs',         // preferências por usuário (ex.: widgets do painel)
+  'auditLog',      // log de auditoria por grupo
 ];
 
 function keyFor(name) {

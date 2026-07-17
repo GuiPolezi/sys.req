@@ -21,7 +21,7 @@ export default function Layout({ children }) {
   void tick; // recomputa os contadores a cada mutação
   const pendingInvites = invitationsForUser(user.id).length;
   const unread = unreadNotifications(activeGroup.id, user.id);
-  const chatUnread = tech ? internalUnreadTotal(activeGroup, user) : 0;
+  const chatUnread = internalUnreadTotal(activeGroup, user); // canais + conversas individuais
   const poolCount = tech ? unassignedTickets(activeGroup.id).length : 0;
 
   // ----- menus (sem ícones — minimalismo) -----
@@ -38,16 +38,21 @@ export default function Layout({ children }) {
         tech && { to: '/pool', label: 'Não atribuídos', badge: poolCount, soft: true },
       ].filter(Boolean),
     },
-    tech && {
+    tech ? {
       key: 'equipe',
       label: 'Equipe',
       badge: chatUnread + pendingInvites,
       items: [
-        { to: '/chat', label: 'Chat interno', badge: chatUnread },
+        { to: '/chat', label: 'Mensagens', badge: chatUnread },
         can.viewMembers(role) && { to: '/team', label: 'Equipe' },
         { to: '/invites', label: 'Convites', badge: pendingInvites },
         can.registerAttendance(role) && { to: '/attendances', label: 'Atendimentos' },
       ].filter(Boolean),
+    } : {
+      key: 'equipe',
+      label: 'Mensagens',
+      to: '/chat',
+      badge: chatUnread,
     },
     (role === 'suporte' || role === 'dev') && {
       key: 'admin',
@@ -57,6 +62,9 @@ export default function Layout({ children }) {
         { to: '/categories', label: 'Categorias' },
         { to: '/systems', label: 'Sistemas' },
         { to: '/services', label: 'Serviços' },
+        { to: '/cities', label: 'Cidades' },
+        { to: '/workflows', label: 'Fluxos de trabalho' },
+        { to: '/slas', label: 'SLA' },
         { sep: true },
         { to: '/ranking', label: 'Ranking' },
         { to: '/audit', label: 'Auditoria' },
@@ -104,6 +112,7 @@ export default function Layout({ children }) {
           <div className="menu-wrap desktop" key={m.key}>
             <NavLink to={m.to} end={m.end} className="menu-trigger" onClick={closeAll}>
               {m.label}
+              {m.badge > 0 && <span className="nav-badge" style={{ marginLeft: 6 }}>{m.badge}</span>}
             </NavLink>
           </div>
         ) : (
@@ -185,6 +194,11 @@ export default function Layout({ children }) {
             <NavLink to="/notifications" className="dd-item" onClick={closeAll}>
               Notificações<span className="spacer" />{unread > 0 && <span className="nav-badge">{unread}</span>}
             </NavLink>
+            {menus.filter((m) => m.to && m.key !== 'painel').map((m) => (
+              <NavLink key={m.key} to={m.to} className="dd-item" onClick={closeAll}>
+                {m.label}<span className="spacer" />{m.badge > 0 && <span className="nav-badge">{m.badge}</span>}
+              </NavLink>
+            ))}
             {menus.filter((m) => m.items).map((m) => (
               <div key={m.key}>
                 <div className="msheet-title">{m.label}</div>

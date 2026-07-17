@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { db, session } from '../lib/store';
-import { authenticate, groupsForUser } from '../lib/domain';
+import { authenticate, groupsForUser, membership } from '../lib/domain';
 
 const AuthContext = createContext(null);
 
@@ -48,14 +48,22 @@ export function AuthProvider({ children }) {
   }, [userId, persist, refresh]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const user = useMemo(() => (userId ? db.byId('users', userId) : null), [userId, tick]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const groups = useMemo(() => (userId ? groupsForUser(userId) : []), [userId, tick]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const activeGroup = useMemo(
     () => (activeGroupId ? db.byId('groups', activeGroupId) : null),
     [activeGroupId, tick]
   );
+  // v0.0.5 — o PAPEL é do grupo, não da conta: user.role reflete a participação
+  // no grupo ativo (assim todas as páginas continuam usando user.role).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const user = useMemo(() => {
+    if (!userId) return null;
+    const raw = db.byId('users', userId);
+    if (!raw) return null;
+    const mem = activeGroup ? membership(activeGroup, userId) : null;
+    return { ...raw, role: mem?.role || raw.role || 'dev', isManager: !!mem?.isManager };
+  }, [userId, activeGroupId, tick]);
 
   const value = {
     user,

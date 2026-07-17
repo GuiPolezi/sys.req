@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { registerUser } from '../lib/domain';
+import { registerUser, groupForCode, cityList } from '../lib/domain';
 import { forceReseed } from '../lib/seed';
 import { getTheme, toggleTheme } from '../lib/theme';
 
@@ -73,22 +73,27 @@ function LoginForm() {
   );
 }
 
+// v0.0.5 — cadastro ÚNICO: sem escolher papel. O código de acesso (opcional)
+// define como a pessoa entra no grupo; o suporte ajusta papéis depois.
 function RegisterForm() {
   const { loginUser } = useAuth();
   const navigate = useNavigate();
-  const [role, setRole] = useState('suporte');
   const [form, setForm] = useState({ name: '', login: '', email: '', password: '', cidade: '', code: '' });
   const [error, setError] = useState('');
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
-  const isRequester = role === 'solicitante';
+
+  // detecta em tempo real o tipo do código digitado
+  const match = groupForCode(form.code);
+  const isRequesterCode = match?.kind === 'solicitante';
+  const groupCities = match ? cityList(match.group.id) : [];
 
   const submit = (e) => {
     e.preventDefault();
     setError('');
     try {
       // registro ATÔMICO: valida o código antes de criar o usuário — nada é gravado se falhar
-      const user = registerUser({ ...form, role }, form.code);
+      const user = registerUser(form, form.code);
       loginUser(user);
       navigate('/');
     } catch (err) {
@@ -101,22 +106,6 @@ function RegisterForm() {
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="field">
-        <label>Tipo de conta</label>
-        <div className="role-pick" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-          {[
-            { k: 'suporte', label: 'Suporte', desc: 'Gerencia' },
-            { k: 'dev', label: 'Dev', desc: 'Resolve' },
-            { k: 'solicitante', label: 'Solicitante', desc: 'Abre chamado' },
-          ].map((o) => (
-            <div key={o.k} className={`role-opt ${role === o.k ? 'sel' : ''}`} onClick={() => setRole(o.k)}>
-              <div className="r-name">{o.label}</div>
-              <div className="muted small">{o.desc}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="field">
         <label>Nome</label>
         <input value={form.name} onChange={set('name')} required />
       </div>
@@ -125,38 +114,47 @@ function RegisterForm() {
           <label>Login</label>
           <input value={form.login} onChange={set('login')} required />
         </div>
-        {isRequester && (
-          <div className="field" style={{ flex: 1 }}>
-            <label>Cidade *</label>
-            <input value={form.cidade} onChange={set('cidade')} required placeholder="Obrigatória" />
-          </div>
-        )}
+        <div className="field" style={{ flex: 1 }}>
+          <label>Senha</label>
+          <input type="password" value={form.password} onChange={set('password')} required />
+        </div>
       </div>
       <div className="field">
         <label>E-mail</label>
         <input type="email" value={form.email} onChange={set('email')} />
       </div>
+
       <div className="field">
-        <label>Senha</label>
-        <input type="password" value={form.password} onChange={set('password')} required />
+        <label>Código de acesso (opcional)</label>
+        <input value={form.code} onChange={set('code')} placeholder="Ex.: A1B2C3" />
+        {match ? (
+          <div className="hint">
+            ✓ Código do grupo <b>{match.group.name}</b> — você entrará como{' '}
+            <b>{isRequesterCode ? 'solicitante' : 'técnico'}</b>.
+          </div>
+        ) : (
+          <div className="hint">Com código você já entra num grupo. Sem código, crie ou entre num grupo depois.</div>
+        )}
       </div>
 
-      {isRequester && (
+      {isRequesterCode && (
         <div className="field">
-          <label>Código de acesso do grupo *</label>
-          <input value={form.code} onChange={set('code')} placeholder="Ex.: A1B2C3" required />
-          <div className="hint">Fornecido pelo suporte da equipe que você vai atender. Sem ele o cadastro não é criado.</div>
+          <label>Cidade *</label>
+          {groupCities.length ? (
+            <select value={form.cidade} onChange={set('cidade')} required>
+              <option value="">Selecione sua cidade</option>
+              {groupCities.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+            </select>
+          ) : (
+            <input value={form.cidade} onChange={set('cidade')} required placeholder="Sua cidade" />
+          )}
+          <div className="hint">Solicitantes veem os chamados da própria cidade.</div>
         </div>
       )}
 
       <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-        {isRequester ? 'Cadastrar e entrar no grupo' : 'Criar conta'}
+        {match ? `Cadastrar e entrar em ${match.group.name}` : 'Criar conta'}
       </button>
-      {!isRequester && (
-        <div className="hint" style={{ textAlign: 'center', marginTop: 8 }}>
-          No próximo passo você cria um grupo ou entra em um com código.
-        </div>
-      )}
     </form>
   );
 }

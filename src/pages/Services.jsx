@@ -3,13 +3,15 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/store';
 import {
   servicesForGroup, createService, updateService, deleteService,
-  categoriesForGroup, systemsForGroup, groupMembers, URGENCY, TICKET_TYPES,
+  categoriesForGroup, systemsForGroup, groupMembers, workflowsForGroup,
+  URGENCY, TICKET_TYPES,
 } from '../lib/domain';
 import { Modal, Empty, ConfirmModal, UrgencyBadge } from '../components/ui';
 
 const EMPTY = {
   name: '', ticketType: 'Solicitação', defaultTitle: '', description: '',
-  systemId: '', categoryId: '', assignMode: 'none', assignTo: '', assignCategoryId: '', urgency: 'media',
+  systemId: '', categoryId: '', assignMode: 'none', assignTo: '', assignCategoryId: '',
+  workflowId: '', urgency: 'media',
 };
 
 // Serviços = modelos que padronizam a criação de chamados. Agrupados por sistema.
@@ -25,6 +27,7 @@ export default function Services() {
   const categories = categoriesForGroup(activeGroup.id);
   const systems = systemsForGroup(activeGroup.id);
   const techs = groupMembers(activeGroup).filter((m) => m.role !== 'solicitante');
+  const workflows = workflowsForGroup(activeGroup.id);
 
   const set = (k) => (e) => setEditing({ ...editing, [k]: e.target.value });
 
@@ -83,7 +86,7 @@ export default function Services() {
                       <b>{s.name}</b>
                       <div className="row" style={{ gap: 2 }}>
                         <button className="btn-ghost btn-sm" title="Editar"
-                          onClick={() => { setError(''); setEditing({ ...EMPTY, ...s, assignMode: s.assignMode || (s.assignTo ? 'user' : 'none'), systemId: s.systemId || '', categoryId: s.categoryId || '', assignTo: s.assignTo || '', assignCategoryId: s.assignCategoryId || '' }); }}>✏️</button>
+                          onClick={() => { setError(''); setEditing({ ...EMPTY, ...s, assignMode: s.assignMode || (s.assignTo ? 'user' : 'none'), systemId: s.systemId || '', categoryId: s.categoryId || '', assignTo: s.assignTo || '', assignCategoryId: s.assignCategoryId || '', workflowId: s.workflowId || '' }); }}>✏️</button>
                         <button className="btn-ghost btn-sm btn-danger" title="Excluir" onClick={() => setConfirm(s)}>🗑️</button>
                       </div>
                     </div>
@@ -95,6 +98,7 @@ export default function Services() {
                     <div className="muted small mt">
                       {s.defaultTitle ? <>Título padrão: “{s.defaultTitle}”<br /></> : null}
                       {describeAssign(s)}
+                      {s.workflowId && <><br />Fluxo: {db.byId('workflows', s.workflowId)?.name || '?'}</>}
                     </div>
                   </div>
                 );
@@ -199,6 +203,17 @@ export default function Services() {
             {editing.assignMode === 'none' && (
               <div className="hint">O chamado ficará sem responsável e aparecerá no pool de não atribuídos.</div>
             )}
+          </div>
+
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Fluxo de trabalho (opcional)</label>
+            <select value={editing.workflowId} onChange={set('workflowId')}>
+              <option value="">— Sem fluxo —</option>
+              {workflows.map((w) => <option key={w.id} value={w.id}>{w.name} ({w.steps.length} etapas)</option>)}
+            </select>
+            <div className="hint">
+              Chamados deste serviço seguem as etapas do fluxo (as etapas seguintes viram subchamados).
+            </div>
           </div>
         </Modal>
       )}

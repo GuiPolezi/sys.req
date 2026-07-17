@@ -19,6 +19,9 @@ import Invites from './pages/Invites';
 import InternalChat from './pages/InternalChat';
 import Profile from './pages/Profile';
 import Notifications from './pages/Notifications';
+import Cities from './pages/Cities';
+import Slas from './pages/Slas';
+import Workflows from './pages/Workflows';
 import Attendances from './pages/Attendances';
 import Ranking from './pages/Ranking';
 import Audit from './pages/Audit';
@@ -62,13 +65,16 @@ export default function App() {
         <Route path="/groups" element={<Groups />} />
         {tech && <Route path="/pool" element={<Pool />} />}
         {tech && <Route path="/assigned" element={<Assigned />} />}
-        {tech && <Route path="/chat" element={<InternalChat />} />}
+        <Route path="/chat" element={<InternalChat />} /> {/* v0.0.5: todos (solicitante vê só DMs) */}
         {tech && <Route path="/invites" element={<Invites />} />}
         {can.viewMembers(role) && <Route path="/team" element={<Team />} />}
         {can.createService(role) && <Route path="/services" element={<Services />} />}
         {can.registerAttendance(role) && <Route path="/attendances" element={<Attendances />} />}
         {can.manageGroup(role) && <Route path="/categories" element={<Categories />} />}
         {can.manageGroup(role) && <Route path="/systems" element={<Systems />} />}
+        {can.manageGroup(role) && <Route path="/cities" element={<Cities />} />}
+        {can.manageGroup(role) && <Route path="/slas" element={<Slas />} />}
+        {can.manageGroup(role) && <Route path="/workflows" element={<Workflows />} />}
         {can.viewReports(role) && <Route path="/ranking" element={<Ranking />} />}
         {can.viewReports(role) && <Route path="/audit" element={<Audit />} />}
         <Route path="*" element={<Navigate to="/" replace />} />

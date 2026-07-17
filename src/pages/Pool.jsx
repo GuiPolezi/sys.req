@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { unassignedTickets, assignTicket } from '../lib/domain';
+import { unassignedTickets, assignTicket, canAssignTickets, groupMembers } from '../lib/domain';
 import { db } from '../lib/store';
 import { UrgencyBadge, Empty, timeAgo } from '../components/ui';
 
@@ -19,6 +19,16 @@ export default function Pool() {
     assignTicket(id, user.id, user);
     refresh();
     navigate(`/tickets/${id}`);
+  };
+
+  // gerente/suporte escolhe a quem atribuir, direto na fila (v0.0.5)
+  const mayAssign = canAssignTickets(activeGroup, user);
+  const techs = groupMembers(activeGroup).filter((m) => m.role !== 'solicitante');
+  const assignTo = (e, id) => {
+    e.stopPropagation();
+    if (!e.target.value) return;
+    assignTicket(id, e.target.value, user);
+    refresh();
   };
 
   const urgent = tickets.filter((t) => t.urgency === 'alta').length;
@@ -57,6 +67,13 @@ export default function Pool() {
                   </div>
                 </div>
                 <UrgencyBadge urgency={t.urgency} />
+                {mayAssign && (
+                  <select defaultValue="" onClick={(e) => e.stopPropagation()} onChange={(e) => assignTo(e, t.id)}
+                    style={{ width: 'auto', maxWidth: 150 }} title="Atribuir para">
+                    <option value="" disabled>Atribuir a…</option>
+                    {techs.map((m) => <option key={m.userId} value={m.userId}>{m.user.name}</option>)}
+                  </select>
+                )}
                 <button className="btn-primary btn-sm" onClick={(e) => take(e, t.id)}>Pegar</button>
               </div>
             );

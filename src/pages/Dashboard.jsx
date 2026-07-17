@@ -3,10 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   ticketsVisibleTo, categoriesForGroup, teamLoad, ticketsAwaitingReview, isTech,
+  getDashPrefs, saveDashPrefs, dashWidgetsFor, slaInfo, SLA_STATUS,
   STATUS, URGENCY,
 } from '../lib/domain';
 import { db } from '../lib/store';
-import { StatusBadge, UrgencyBadge, Empty, timeAgo } from '../components/ui';
+import { StatusBadge, UrgencyBadge, Empty, timeAgo, Modal } from '../components/ui';
 import { AreaChart, BarList, Donut, ColumnChart } from '../components/Charts';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -60,11 +61,35 @@ export default function Dashboard() {
   const load = tech ? teamLoad(activeGroup) : [];
   const awaiting = user.role === 'solicitante' ? ticketsAwaitingReview(activeGroup.id, user.id) : [];
 
+  // painel personalizável (v0.0.5): cada usuário escolhe seus widgets
+  const [customizing, setCustomizing] = useState(false);
+  const [prefsTick, setPrefsTick] = useState(0);
+  void prefsTick;
+  const available = dashWidgetsFor(user.role);
+  const widgets = getDashPrefs(activeGroup.id, user.id, user.role)
+    .filter((k) => available.some((w) => w.key === k));
+  const show = (k) => widgets.includes(k);
+  const toggleWidget = (k) => {
+    const next = show(k) ? widgets.filter((x) => x !== k) : [...widgets, k];
+    saveDashPrefs(activeGroup.id, user.id, next);
+    setPrefsTick((n) => n + 1);
+  };
+
+  // situação de SLA dos chamados visíveis (widget)
+  const slaCounts = tech ? tickets.reduce((acc, t) => {
+    const info = slaInfo(t);
+    if (info) acc[info.status] = (acc[info.status] || 0) + 1;
+    return acc;
+  }, {}) : {};
+
   return (
     <div>
-      <div className="page-head">
-        <h1>Painel</h1>
-        <p className="muted">{greeting} — {activeGroup.name}</p>
+      <div className="row between wrap page-head" style={{ gap: 10 }}>
+        <div>
+          <h1>Painel</h1>
+          <p className="muted">{greeting} — {activeGroup.name}</p>
+        </div>
+        <button className="btn-sm" onClick={() => setCustomizing(true)}>Personalizar painel</button>
       </div>
 
       {/* aviso destacado: chamados aguardando a análise do solicitante */}
@@ -86,6 +111,7 @@ export default function Dashboard() {
       )}
 
       {/* KPIs */}
+      {show('kpis') && (
       <div className="stats mb">
         <div className="stat"><div className="n">{tickets.length}</div><div className="l">Total de chamados</div></div>
         <div className="stat"><div className="n" style={{ color: '#E06A4E' }}>{urgent.length}</div><div className="l"><strong>Urgentes</strong></div></div>
@@ -95,8 +121,10 @@ export default function Dashboard() {
         )}
         <div className="stat"><div className="n" style={{ color: '#34B27A' }}>{done.length}</div><div className="l">Concluídos</div></div>
       </div>
+      )}
 
       {/* série temporal */}
+      {show('serie') && (
       <div className="card card-pad mb">
         <div className="row between wrap" style={{ gap: 10 }}>
           <div>
@@ -114,9 +142,12 @@ export default function Dashboard() {
           <AreaChart data={perDay} />
         </div>
       </div>
+      )}
 
       {/* status (donut) + urgência/categoria (barras) */}
+      {(show('status') || show('urgencia')) && (
       <div className="grid grid-2 mb">
+        {show('status') && (
         <div className="card card-pad">
           <h3>Por status</h3>
           {tickets.length === 0 ? <p className="muted small">Sem dados.</p> : (
@@ -133,7 +164,9 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+        )}
 
+        {show('urgencia') && user.role !== 'solicitante' && (
         <div className="card card-pad">
           <h3>Por urgência</h3>
           <div style={{ marginTop: 10 }}>
@@ -145,10 +178,27 @@ export default function Dashboard() {
             <BarList items={catItems} empty="Nenhum chamado categorizado." />
           </div>
         </div>
+        )}
       </div>
+      )}
+
+      {/* situação de SLA (v0.0.5) */}
+      {tech && show('sla') && (
+        <div className="card card-pad mb">
+          <h3>Situação de SLA</h3>
+          <div className="stats" style={{ marginTop: 10 }}>
+            {['ok', 'risco', 'estourado', 'cumprido', 'violado'].map((k) => (
+              <div key={k} className="stat">
+                <div className="n" style={{ color: SLA_STATUS[k].color }}>{slaCounts[k] || 0}</div>
+                <div className="l">{SLA_STATUS[k].label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* carga da equipe — painel privado dos técnicos */}
-      {tech && (
+      {tech && show('equipe') && (
         <div className="card card-pad mb">
           <div className="row between wrap" style={{ gap: 8 }}>
             <div>
@@ -164,10 +214,12 @@ export default function Dashboard() {
       )}
 
       {/* atividade recente */}
+      {show('recentes') && (
+      <>
       <div className="row between mb">
         <h2 style={{ margin: 0 }}>Atividade recente</h2>
         <div className="row">
-          <Link to="/tickets/new" className="btn btn-primary btn-sm">➕ Abrir chamado</Link>
+          <Link to="/tickets/new" className="btn btn-primary btn-sm">Abrir chamado</Link>
           <Link to="/tickets" className="btn btn-sm">Ver todos →</Link>
         </div>
       </div>
@@ -180,10 +232,11 @@ export default function Dashboard() {
             const cat = t.categoryId ? db.byId('categories', t.categoryId) : null;
             return (
               <div key={t.id} className="ticket-row" onClick={() => navigate(`/tickets/${t.id}`)}>
+                <span className="tkt-num">#{t.number || ''}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="t-title">{t.urgentAlert && '🚨 '}{t.title}</div>
                   <div className="t-meta">
-                    #{t.id.slice(-4)} · {cat ? `${cat.name} · ` : ''}criado {timeAgo(t.createdAt)}
+                    {cat ? `${cat.name} · ` : ''}criado {timeAgo(t.createdAt)}
                   </div>
                 </div>
                 <UrgencyBadge urgency={t.urgency} />
@@ -193,6 +246,29 @@ export default function Dashboard() {
           })
         )}
       </div>
+      </>
+      )}
+
+      {widgets.length === 0 && (
+        <div className="card"><Empty>Nenhum widget ativo. Clique em “Personalizar painel”.</Empty></div>
+      )}
+
+      {customizing && (
+        <Modal title="Personalizar painel" onClose={() => setCustomizing(false)}
+          footer={<button className="btn-primary" onClick={() => setCustomizing(false)}>Pronto</button>}>
+          <p className="muted small" style={{ marginTop: 0 }}>
+            Escolha o que aparece no seu painel. A preferência é sua — cada usuário tem a própria configuração.
+          </p>
+          <div className="col" style={{ gap: 10 }}>
+            {available.map((w) => (
+              <label key={w.key} className="row" style={{ gap: 10, textTransform: 'none', fontSize: 14, fontWeight: 450, marginBottom: 0 }}>
+                <input type="checkbox" style={{ width: 'auto' }} checked={show(w.key)} onChange={() => toggleWidget(w.key)} />
+                {w.label}
+              </label>
+            ))}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

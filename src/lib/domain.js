@@ -126,49 +126,55 @@ export function findUserByLogin(login) {
   return db.find('users', (u) => u.login.toLowerCase() === l || u.email.toLowerCase() === l);
 }
 
-export function createUser({ name, login, email, password, role, cidade }) {
+// v0.0.5 — cadastro UNIFICADO: a conta não tem papel fixo; o papel é definido
+// pela participação em cada grupo (código usado ou configuração do suporte).
+export function createUser({ name, login, email, password, cidade }) {
   if (findUserByLogin(login)) throw new Error('Login já em uso.');
   if (email && db.find('users', (u) => u.email.toLowerCase() === email.toLowerCase()))
     throw new Error('E-mail já cadastrado.');
-  if (role === 'solicitante' && !(cidade || '').trim())
-    throw new Error('Solicitante precisa informar a cidade.');
   const user = {
     id: uid('user'),
     name: name.trim(),
     login: login.trim(),
     email: (email || '').trim(),
     password, // alpha: texto plano. No projeto real, hash no backend.
-    role,
     cidade: (cidade || '').trim(),
     createdAt: nowISO(),
   };
   return db.insert('users', user);
 }
 
-// Cadastro ATÔMICO (v0.0.3 — corrige o bug de criar o usuário mesmo com código inválido).
-// Valida TUDO antes de gravar qualquer coisa.
-export function registerUser(data, code) {
-  const role = data.role;
+// Identifica o grupo (e o tipo de acesso) de um código digitado.
+export function groupForCode(code) {
+  const c = (code || '').trim().toUpperCase();
+  if (!c) return null;
+  const group = db.find('groups', (g) => g.requesterCode === c || g.techInviteCode === c);
+  if (!group) return null;
+  return { group, kind: group.requesterCode === c ? 'solicitante' : 'tecnico' };
+}
 
-  // 1) valida o código ANTES de criar o usuário
-  let group = null;
-  if (role === 'solicitante') {
-    const c = (code || '').trim().toUpperCase();
-    if (!c) throw new Error('Informe o código de acesso fornecido pelo suporte.');
-    group = db.find('groups', (g) => g.requesterCode === c || g.techInviteCode === c);
-    if (!group) throw new Error('Código inválido.');
-    if (group.requesterCode !== c)
-      throw new Error('Este código é de convite de técnicos. Peça ao suporte o código de solicitantes.');
+// Cadastro ATÔMICO: valida TUDO antes de gravar qualquer coisa.
+// - código de solicitante → entra no grupo como solicitante (cidade obrigatória)
+// - código de técnico     → entra no grupo como dev (o suporte pode promover depois)
+// - sem código            → conta criada; cria ou entra num grupo depois
+export function registerUser(data, code) {
+  const c = (code || '').trim();
+  let match = null;
+  if (c) {
+    match = groupForCode(c);
+    if (!match) throw new Error('Código inválido.');
+    if (match.kind === 'solicitante' && !(data.cidade || '').trim())
+      throw new Error('Para entrar como solicitante, informe a cidade.');
   }
 
-  // 2) valida os demais dados (login, e-mail, cidade) — createUser lança se houver problema
   const user = createUser(data);
 
-  // 3) vincula ao grupo
-  if (group) {
-    const members = [...group.members, { userId: user.id, role: user.role, categoryIds: [], joinedAt: nowISO() }];
-    db.update('groups', group.id, { members });
-    logAudit(group.id, user.id, 'membro.entrou', `${user.name} cadastrou-se com o código de solicitantes.`);
+  if (match) {
+    const role = match.kind === 'solicitante' ? 'solicitante' : 'dev';
+    const members = [...match.group.members, { userId: user.id, role, categoryIds: [], joinedAt: nowISO() }];
+    db.update('groups', match.group.id, { members });
+    logAudit(match.group.id, user.id, 'membro.entrou',
+      `${user.name} cadastrou-se com código de ${match.kind === 'solicitante' ? 'solicitante' : 'técnico'}.`);
   }
   return user;
 }
@@ -193,7 +199,8 @@ export function createGroup({ name, description }, ownerUser) {
     name: name.trim(),
     description: (description || '').trim(),
     ownerId: ownerUser.id,
-    members: [{ userId: ownerUser.id, role: ownerUser.role, categoryIds: [], joinedAt: nowISO() }],
+    // quem cria o grupo é o suporte dele (papel é por grupo desde a v0.0.5)
+    members: [{ userId: ownerUser.id, role: 'suporte', categoryIds: [], joinedAt: nowISO() }],
     techInviteCode: shortCode(),
     requesterCode: shortCode(),
     createdAt: nowISO(),
@@ -223,28 +230,154 @@ export function groupMembers(group) {
     .filter((m) => m.user);
 }
 
+// O código usado define o papel no grupo: requester → solicitante, tech → dev.
 export function joinGroupByCode(user, code) {
-  const c = code.trim().toUpperCase();
-  const group = db.find('groups', (g) => g.techInviteCode === c || g.requesterCode === c);
-  if (!group) throw new Error('Código inválido.');
-
-  const isRequesterCode = group.requesterCode === c;
-  if (user.role === 'solicitante' && !isRequesterCode)
-    throw new Error('Este código não é de acesso para solicitantes.');
-  if (user.role !== 'solicitante' && isRequesterCode)
-    throw new Error('Este código é de acesso para solicitantes.');
+  const match = groupForCode(code);
+  if (!match) throw new Error('Código inválido.');
+  const { group, kind } = match;
+  const role = kind === 'solicitante' ? 'solicitante' : 'dev';
+  if (role === 'solicitante' && !(user.cidade || '').trim())
+    throw new Error('Para entrar como solicitante, defina sua cidade no perfil primeiro.');
 
   if (membership(group, user.id)) return group;
-  const members = [...group.members, { userId: user.id, role: user.role, categoryIds: [], joinedAt: nowISO() }];
+  const members = [...group.members, { userId: user.id, role, categoryIds: [], joinedAt: nowISO() }];
   const updated = db.update('groups', group.id, { members });
-  logAudit(group.id, user.id, 'membro.entrou', `${user.name} entrou via código.`);
+  logAudit(group.id, user.id, 'membro.entrou', `${user.name} entrou via código (${role}).`);
   return updated;
+}
+
+// ------------------------------------------------------------
+//  GESTÃO DE MEMBROS (v0.0.5) — papel, gerente, perfil, remoção
+// ------------------------------------------------------------
+function patchMember(groupId, userId, patch) {
+  const group = db.byId('groups', groupId);
+  const members = group.members.map((m) => (m.userId === userId ? { ...m, ...patch } : m));
+  return db.update('groups', groupId, { members });
+}
+
+// Papel EFETIVO de um usuário num grupo. Nunca confie em actor.role
+// diretamente: com o cadastro unificado, a conta pode não ter papel —
+// a fonte da verdade é a membership.
+export function roleInGroup(groupOrId, userId, fallback = null) {
+  const group = typeof groupOrId === 'string' ? db.byId('groups', groupOrId) : groupOrId;
+  return membership(group, userId)?.role || fallback;
+}
+
+function assertSuporte(groupId, actor, message) {
+  if (roleInGroup(groupId, actor.id, actor.role) !== 'suporte') throw new Error(message);
+}
+
+// Suporte define se o técnico é suporte ou dev (RP da v0.0.5)
+export function setMemberRole(groupId, userId, role, actor) {
+  assertSuporte(groupId, actor, 'Apenas o suporte pode alterar papéis.');
+  const group = db.byId('groups', groupId);
+  if (group.ownerId === userId && role !== 'suporte')
+    throw new Error('O dono do grupo precisa continuar como suporte.');
+  const g = patchMember(groupId, userId, { role });
+  const who = db.byId('users', userId)?.name || '?';
+  logAudit(groupId, actor.id, 'membro.papel', `${who} agora é ${ROLES[role]?.label || role}.`);
+  return g;
+}
+
+// Marca/desmarca um técnico como GERENTE (pode atribuir chamados)
+export function setMemberManager(groupId, userId, isManager, actor) {
+  assertSuporte(groupId, actor, 'Apenas o suporte pode definir gerentes.');
+  const g = patchMember(groupId, userId, { isManager: !!isManager });
+  const who = db.byId('users', userId)?.name || '?';
+  logAudit(groupId, actor.id, 'membro.gerente', `${who} ${isManager ? 'agora é gerente' : 'não é mais gerente'}.`);
+  return g;
+}
+
+export function isManagerOf(group, userId) {
+  return !!membership(group, userId)?.isManager;
+}
+
+// Quem pode ATRIBUIR chamados neste grupo (respeita a permissão configurada).
+export function canAssignTickets(group, user) {
+  if (user.role === 'suporte') return true;
+  const perms = groupPermissions(group);
+  return perms.assignTickets === 'sup_ger' && isManagerOf(group, user.id);
+}
+
+// Quem pode alterar a URGÊNCIA de um chamado (permissão configurável).
+export function canChangeUrgency(group, ticket, user) {
+  if (isTicketClosed(ticket)) return false;
+  const perms = groupPermissions(group);
+  if (perms.urgencyChange === 'suporte') return user.role === 'suporte';
+  return isTicketOwner(ticket, user); // 'owner'
+}
+
+// A exclusão de chamados está liberada para este usuário?
+export function canDeleteTickets(group, user) {
+  return groupPermissions(group).ticketDelete === 'suporte' && user.role === 'suporte';
+}
+
+// Suporte edita o perfil de um membro (nome, e-mail, senha, cidade)
+export function adminUpdateUser(groupId, userId, patch, actor) {
+  assertSuporte(groupId, actor, 'Apenas o suporte pode editar membros.');
+  const clean = {};
+  if (patch.name?.trim()) clean.name = patch.name.trim();
+  if (patch.email !== undefined) clean.email = patch.email.trim();
+  if (patch.cidade !== undefined) clean.cidade = patch.cidade.trim();
+  if (patch.password) clean.password = patch.password;
+  const u = db.update('users', userId, clean);
+  logAudit(groupId, actor.id, 'membro.editado',
+    `Perfil de ${u?.name || '?'} editado pelo suporte${patch.password ? ' (senha redefinida)' : ''}.`);
+  return u;
+}
+
+// Suporte remove um membro do grupo (chamados dele voltam ao pool)
+export function removeMember(groupId, userId, actor) {
+  assertSuporte(groupId, actor, 'Apenas o suporte pode remover membros.');
+  const group = db.byId('groups', groupId);
+  if (group.ownerId === userId) throw new Error('O dono do grupo não pode ser removido.');
+  const who = db.byId('users', userId)?.name || '?';
+  const members = group.members.filter((m) => m.userId !== userId);
+  db.update('groups', groupId, { members });
+  db.filter('tickets', (t) => t.groupId === groupId && t.assignedTo === userId)
+    .forEach((t) => db.update('tickets', t.id, { assignedTo: null, status: t.status === 'concluido' ? 'concluido' : 'aberto' }));
+  logAudit(groupId, actor.id, 'membro.removido', `${who} foi removido do grupo.`);
+}
+
+// ------------------------------------------------------------
+//  PERMISSÕES CONFIGURÁVEIS DO GRUPO (v0.0.5)
+// ------------------------------------------------------------
+export const DEFAULT_PERMISSIONS = {
+  ticketDelete: 'off',        // 'off' | 'suporte'  — exclusão de chamados
+  urgencyChange: 'owner',     // 'owner' | 'suporte' — quem muda urgência
+  assignTickets: 'sup_ger',   // 'sup_ger' | 'suporte' — quem atribui (gerentes incluídos?)
+};
+
+export function groupPermissions(group) {
+  return { ...DEFAULT_PERMISSIONS, ...(group?.permissions || {}) };
+}
+
+export function updateGroupPermissions(groupId, permissions, actor) {
+  assertSuporte(groupId, actor, 'Apenas o suporte pode configurar permissões.');
+  const g = db.update('groups', groupId, { permissions });
+  logAudit(groupId, actor.id, 'grupo.permissoes', 'Permissões do grupo atualizadas.');
+  return g;
+}
+
+// Exclusão de chamado — bloqueada por padrão; liberável ao suporte via permissão.
+export function deleteTicket(id, actor) {
+  const t = db.byId('tickets', id);
+  if (!t) return;
+  const group = db.byId('groups', t.groupId);
+  const perms = groupPermissions(group);
+  if (perms.ticketDelete !== 'suporte' || roleInGroup(group, actor.id, actor.role) !== 'suporte')
+    throw new Error('A exclusão de chamados está bloqueada pelas permissões do grupo.');
+  const children = db.filter('tickets', (x) => x.parentId === id && x.status !== 'concluido');
+  if (children.length) throw new Error('Este chamado tem subchamados abertos — conclua ou exclua-os antes.');
+  db.filter('ticketMessages', (m) => m.ticketId === id).forEach((m) => db.remove('ticketMessages', m.id));
+  db.remove('tickets', id);
+  logAudit(t.groupId, actor.id, 'ticket.excluido', `#${t.number || t.id.slice(-4)} "${t.title}" excluído.`);
 }
 
 export function leaveGroup(groupId, user) {
   const group = db.byId('groups', groupId);
   if (!group) throw new Error('Grupo não encontrado.');
-  if (!can.leaveGroup(user.role)) throw new Error('Solicitantes não podem sair do grupo.');
+  if (!can.leaveGroup(roleInGroup(group, user.id, user.role))) throw new Error('Solicitantes não podem sair do grupo.');
   if (group.ownerId === user.id) throw new Error('O dono não pode sair. Transfira ou apague o grupo.');
   const members = group.members.filter((m) => m.userId !== user.id);
   db.update('groups', groupId, { members });
@@ -256,7 +389,8 @@ export function leaveGroup(groupId, user) {
 export function deleteGroup(groupId, actor) {
   const group = db.byId('groups', groupId);
   if (!group) return;
-  if (actor.role !== 'suporte') throw new Error('Apenas o suporte pode apagar o grupo.');
+  if (roleInGroup(group, actor.id, actor.role) !== 'suporte')
+    throw new Error('Apenas o suporte pode apagar o grupo.');
   const ids = db.filter('tickets', (t) => t.groupId === groupId).map((t) => t.id);
   db.filter('ticketMessages', (m) => ids.includes(m.ticketId)).forEach((m) => db.remove('ticketMessages', m.id));
   ['tickets', 'internalMessages', 'categories', 'systems', 'services', 'invitations',
@@ -287,8 +421,6 @@ export function updateMemberCategories(groupId, userId, categoryIds, actor) {
 export function createInvitation(groupId, inviteeLogin, actor) {
   const invitee = findUserByLogin(inviteeLogin);
   if (!invitee) throw new Error('Usuário não encontrado. Ele precisa ter conta.');
-  if (invitee.role === 'solicitante')
-    throw new Error('Solicitantes entram pelo código de cadastro, não por convite.');
   const group = db.byId('groups', groupId);
   if (membership(group, invitee.id)) throw new Error('Usuário já é membro do grupo.');
   const pending = db.find('invitations',
@@ -324,7 +456,8 @@ export function respondInvitation(inviteId, accept) {
   if (accept) {
     const group = db.byId('groups', invite.groupId);
     if (!membership(group, user.id)) {
-      const members = [...group.members, { userId: user.id, role: user.role, categoryIds: [], joinedAt: nowISO() }];
+      // convidado entra como dev; o suporte pode promover depois (v0.0.5)
+      const members = [...group.members, { userId: user.id, role: 'dev', categoryIds: [], joinedAt: nowISO() }];
       db.update('groups', group.id, { members });
     }
     logAudit(invite.groupId, user.id, 'convite.aceito', `${user.name} aceitou o convite.`);
@@ -433,6 +566,7 @@ export function createService(groupId, data, actor) {
     assignMode: data.assignMode || 'none',
     assignTo: data.assignMode === 'user' ? (data.assignTo || null) : null,
     assignCategoryId: data.assignMode === 'category' ? (data.assignCategoryId || null) : null,
+    workflowId: data.workflowId || null, // fluxo de trabalho vinculado (v0.0.5)
     urgency: data.urgency || 'media',
     createdAt: nowISO(),
   };
@@ -452,6 +586,7 @@ export function updateService(id, data, actor) {
     assignMode: data.assignMode || 'none',
     assignTo: data.assignMode === 'user' ? (data.assignTo || null) : null,
     assignCategoryId: data.assignMode === 'category' ? (data.assignCategoryId || null) : null,
+    workflowId: data.workflowId || null,
     urgency: data.urgency || 'media',
   });
   logAudit(svc.groupId, actor?.id, 'servico.editado', `Serviço "${svc.name}" editado.`);
@@ -492,17 +627,239 @@ export function teamLoad(group) {
 }
 
 // ------------------------------------------------------------
+//  CIDADES (v0.0.5) — cadastro; campos "cidade" viram seleção
+// ------------------------------------------------------------
+export function cityList(groupId) {
+  return db.filter('cities', (c) => c.groupId === groupId).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function createCity(groupId, name, actor) {
+  const n = (name || '').trim();
+  if (!n) throw new Error('Informe o nome da cidade.');
+  if (cityList(groupId).some((c) => c.name.toLowerCase() === n.toLowerCase()))
+    throw new Error('Cidade já cadastrada.');
+  const city = db.insert('cities', { id: uid('city'), groupId, name: n, createdAt: nowISO() });
+  logAudit(groupId, actor?.id, 'cidade.criada', `Cidade "${n}" cadastrada.`);
+  return city;
+}
+
+export function deleteCity(id, actor) {
+  const c = db.byId('cities', id);
+  db.remove('cities', id);
+  if (c) logAudit(c.groupId, actor?.id, 'cidade.removida', `Cidade "${c.name}" removida.`);
+}
+
+// ------------------------------------------------------------
+//  SLA (v0.0.5) — prazos por urgência (e opcionalmente categoria)
+// ------------------------------------------------------------
+export function slasForGroup(groupId) {
+  return db.filter('slas', (s) => s.groupId === groupId);
+}
+
+export function createSla(groupId, data, actor) {
+  if (!data.name.trim()) throw new Error('Informe o nome do SLA.');
+  const sla = {
+    id: uid('sla'),
+    groupId,
+    name: data.name.trim(),
+    urgency: data.urgency || null,          // casa com a urgência do chamado (null = qualquer)
+    categoryId: data.categoryId || null,    // opcional: restringe à categoria
+    responseHours: Number(data.responseHours) || 0,   // prazo de 1ª resposta
+    resolutionHours: Number(data.resolutionHours) || 0, // prazo de solução
+    createdAt: nowISO(),
+  };
+  db.insert('slas', sla);
+  logAudit(groupId, actor?.id, 'sla.criado', `SLA "${sla.name}" criado.`);
+  return sla;
+}
+
+export function updateSla(id, data, actor) {
+  const s = db.update('slas', id, {
+    name: data.name.trim(),
+    urgency: data.urgency || null,
+    categoryId: data.categoryId || null,
+    responseHours: Number(data.responseHours) || 0,
+    resolutionHours: Number(data.resolutionHours) || 0,
+  });
+  logAudit(s.groupId, actor?.id, 'sla.editado', `SLA "${s.name}" editado.`);
+  return s;
+}
+
+export function deleteSla(id, actor) {
+  const s = db.byId('slas', id);
+  db.remove('slas', id);
+  if (s) logAudit(s.groupId, actor?.id, 'sla.removido', `SLA "${s.name}" removido.`);
+}
+
+// Melhor SLA para um chamado: categoria+urgência > urgência > genérico.
+export function matchSla(groupId, { urgency, categoryId }) {
+  const all = slasForGroup(groupId);
+  return (
+    all.find((s) => s.urgency === urgency && s.categoryId && s.categoryId === categoryId) ||
+    all.find((s) => s.urgency === urgency && !s.categoryId) ||
+    all.find((s) => !s.urgency && !s.categoryId) ||
+    null
+  );
+}
+
+// Situação do SLA de um chamado (prazo de solução).
+export function slaInfo(ticket) {
+  const sla = ticket.slaId ? db.byId('slas', ticket.slaId) : matchSla(ticket.groupId, ticket);
+  if (!sla || !sla.resolutionHours) return null;
+  const deadline = new Date(new Date(ticket.createdAt).getTime() + sla.resolutionHours * 3600_000);
+  const done = ticket.status === 'concluido';
+  const ref = done ? new Date(ticket.updatedAt) : new Date();
+  const remainingMs = deadline.getTime() - ref.getTime();
+  let status;
+  if (done) status = remainingMs >= 0 ? 'cumprido' : 'violado';
+  else if (remainingMs < 0) status = 'estourado';
+  else if (remainingMs < 0.25 * sla.resolutionHours * 3600_000) status = 'risco';
+  else status = 'ok';
+  return { sla, deadline, status, remainingMs };
+}
+
+export const SLA_STATUS = {
+  ok: { label: 'Dentro do prazo', color: '#34B27A' },
+  risco: { label: 'Perto de vencer', color: '#E3A93C' },
+  estourado: { label: 'Prazo estourado', color: '#E06A4E' },
+  cumprido: { label: 'Cumprido', color: '#34B27A' },
+  violado: { label: 'Violado', color: '#E06A4E' },
+};
+
+// ------------------------------------------------------------
+//  WORKFLOWS (v0.0.5) — etapas que geram subchamados encadeados
+//  Ex.: "Criar site" (dev) → etapa "Checklist" (suporte) → devolve → finaliza.
+// ------------------------------------------------------------
+export function workflowsForGroup(groupId) {
+  return db.filter('workflows', (w) => w.groupId === groupId);
+}
+
+// step: { title, description, assignType: 'suporte'|'category'|'user'|'creator',
+//         assignCategoryId?, assignUserId? }
+export function createWorkflow(groupId, { name, steps }, actor) {
+  if (!name.trim()) throw new Error('Informe o nome do fluxo.');
+  const clean = (steps || []).filter((s) => s.title?.trim());
+  if (!clean.length) throw new Error('Adicione pelo menos uma etapa.');
+  const wf = db.insert('workflows', {
+    id: uid('wf'), groupId, name: name.trim(),
+    steps: clean.map((s) => ({
+      title: s.title.trim(),
+      description: (s.description || '').trim(),
+      assignType: s.assignType || 'suporte',
+      assignCategoryId: s.assignCategoryId || null,
+      assignUserId: s.assignUserId || null,
+    })),
+    createdAt: nowISO(),
+  });
+  logAudit(groupId, actor?.id, 'workflow.criado', `Fluxo "${wf.name}" criado (${wf.steps.length} etapa(s)).`);
+  return wf;
+}
+
+export function updateWorkflow(id, { name, steps }, actor) {
+  const wf = db.update('workflows', id, {
+    name: name.trim(),
+    steps: (steps || []).filter((s) => s.title?.trim()),
+  });
+  logAudit(wf.groupId, actor?.id, 'workflow.editado', `Fluxo "${wf.name}" editado.`);
+  return wf;
+}
+
+export function deleteWorkflow(id, actor) {
+  const wf = db.byId('workflows', id);
+  db.remove('workflows', id);
+  if (wf) logAudit(wf.groupId, actor?.id, 'workflow.removido', `Fluxo "${wf.name}" removido.`);
+}
+
+// Resolve a atribuição de uma etapa do fluxo.
+function resolveStepAssignee(group, step, parentTicket) {
+  if (step.assignType === 'user') return step.assignUserId || null;
+  if (step.assignType === 'category') return pickDevForCategory(group, step.assignCategoryId);
+  if (step.assignType === 'creator') return parentTicket?.assignedTo || null; // devolve ao responsável do pai
+  // 'suporte': o suporte com menos chamados ativos
+  const sups = group.members.filter((m) => m.role === 'suporte');
+  if (!sups.length) return null;
+  const load = sups.map((m) => ({
+    userId: m.userId,
+    count: db.filter('tickets',
+      (t) => t.groupId === group.id && t.assignedTo === m.userId && t.status !== 'concluido').length,
+  })).sort((a, b) => a.count - b.count);
+  return load[0].userId;
+}
+
+// Subchamados de um chamado
+export function childTickets(parentId) {
+  return db.filter('tickets', (t) => t.parentId === parentId);
+}
+export function openChildTickets(parentId) {
+  return childTickets(parentId).filter((t) => t.status !== 'concluido');
+}
+
+// Próxima etapa do fluxo do chamado (null se acabou / sem fluxo)
+export function nextWorkflowStep(ticket) {
+  if (!ticket.workflowId) return null;
+  const wf = db.byId('workflows', ticket.workflowId);
+  if (!wf) return null;
+  const done = childTickets(ticket.id).filter((t) => t.workflowStep != null).map((t) => t.workflowStep);
+  const nextIdx = wf.steps.findIndex((_, i) => i > 0 && !done.includes(i));
+  if (nextIdx === -1) return null;
+  return { wf, step: wf.steps[nextIdx], index: nextIdx };
+}
+
+// Gera o subchamado da próxima etapa do fluxo.
+export function advanceWorkflow(ticketId, actor) {
+  const parent = db.byId('tickets', ticketId);
+  const nxt = nextWorkflowStep(parent);
+  if (!nxt) throw new Error('Não há próxima etapa neste fluxo.');
+  const group = db.byId('groups', parent.groupId);
+  const assignedTo = resolveStepAssignee(group, nxt.step, parent);
+  const sub = createTicket(parent.groupId, {
+    title: `${nxt.step.title} — ${parent.title}`,
+    description: nxt.step.description ? `<p>${nxt.step.description}</p>` : '',
+    type: parent.type,
+    categoryId: parent.categoryId,
+    systemId: parent.systemId,
+    urgency: parent.urgency,
+    assignTo: assignedTo,
+    requesterId: parent.requesterId,
+    requesterName: parent.requesterName,
+    cidade: parent.cidade,
+    parentId: parent.id,
+    workflowId: parent.workflowId,
+    workflowStep: nxt.index,
+  }, actor);
+  logAudit(parent.groupId, actor.id, 'workflow.etapa',
+    `Etapa "${nxt.step.title}" gerada a partir de #${parent.number || parent.id.slice(-4)}.`);
+  return sub;
+}
+
+// Cria um subchamado manual (sem fluxo) a partir de um chamado.
+export function createSubticket(parentId, data, actor) {
+  const parent = db.byId('tickets', parentId);
+  const sub = createTicket(parent.groupId, {
+    ...data,
+    requesterId: parent.requesterId,
+    requesterName: parent.requesterName,
+    cidade: parent.cidade,
+    parentId: parent.id,
+  }, actor);
+  return sub;
+}
+
+// ------------------------------------------------------------
 //  TICKETS
 // ------------------------------------------------------------
 export function createTicket(groupId, data, author, serviceId = null) {
   const group = db.byId('groups', groupId);
   const service = serviceId ? db.byId('services', serviceId) : null;
 
+  // papel efetivo do autor NESTE grupo (v0.0.5 — papel é por membership)
+  const authorRole = membership(group, author.id)?.role || author.role || 'dev';
+
   // solicitante do chamado (pode ser diferente de quem registrou)
   let requesterId = null;
   let requesterName = '';
   let cidade = '';
-  if (author.role === 'solicitante') {
+  if (authorRole === 'solicitante') {
     requesterId = author.id;
     requesterName = author.name;
     cidade = author.cidade || '';
@@ -525,8 +882,15 @@ export function createTicket(groupId, data, author, serviceId = null) {
     else if (mode === 'category') assignedTo = pickDevForCategory(group, service.assignCategoryId);
   }
 
+  // número sequencial por grupo (v0.0.5)
+  const number = db.filter('tickets', (t) => t.groupId === groupId)
+    .reduce((max, t) => Math.max(max, t.number || 0), 0) + 1;
+  const urgency = data.urgency || service?.urgency || 'media';
+  const sla = matchSla(groupId, { urgency, categoryId });
+
   const ticket = {
     id: uid('tkt'),
+    number,
     groupId,
     title: data.title.trim(),
     description: data.description || '', // HTML do editor rico
@@ -534,13 +898,18 @@ export function createTicket(groupId, data, author, serviceId = null) {
     categoryId,
     systemId,
     status: assignedTo ? 'em_andamento' : 'aberto',
-    urgency: data.urgency || service?.urgency || 'media',
+    urgency,
     urgentAlert: false,
     createdBy: author.id,
     requesterId,
     requesterName,
     assignedTo,
     serviceId: serviceId || null,
+    slaId: sla?.id || null,
+    workflowId: data.workflowId || service?.workflowId || null,
+    workflowStep: data.workflowStep ?? (data.workflowId || service?.workflowId ? 0 : null),
+    parentId: data.parentId || null,
+    techReview: null, // análise técnica: { requestedBy, assignedTo, note, response, status, at }
     cidade: cidade.trim(),
     attendances: [],
     createdAt: nowISO(),
@@ -568,11 +937,55 @@ export function assignTicket(id, userId, actor) {
 }
 
 export function setStatus(id, status, actor) {
+  // um chamado com subchamados abertos não pode ser concluído (fluxo pai/filho)
+  if (status === 'concluido' && openChildTickets(id).length > 0)
+    throw new Error('Este chamado tem subchamados abertos. Conclua as etapas antes de finalizá-lo.');
   const t = updateTicket(id, { status });
   const label = STATUS[status]?.label || status;
-  logAudit(t.groupId, actor?.id, 'ticket.status', `#${id.slice(-4)} → ${label}.`);
+  logAudit(t.groupId, actor?.id, 'ticket.status', `#${t.number || id.slice(-4)} → ${label}.`);
   notifyTicketParties(t, actor?.id, 'status', `Chamado "${t.title}" agora está: ${label}`);
+
+  // subchamado concluído → avisa o responsável pelo chamado pai (devolução do fluxo)
+  if (status === 'concluido' && t.parentId) {
+    const parent = db.byId('tickets', t.parentId);
+    if (parent?.assignedTo && parent.assignedTo !== actor?.id) {
+      notify(t.groupId, parent.assignedTo, 'status',
+        `✅ Etapa "${t.title}" concluída — o chamado #${parent.number || ''} pode seguir.`, parent.id);
+    }
+  }
   return t;
+}
+
+// ------------------------------------------------------------
+//  ANÁLISE TÉCNICA (v0.0.5) — dev encaminha ao SUPORTE, que responde
+// ------------------------------------------------------------
+export function requestTechReview(ticketId, suporteId, note, actor) {
+  const t = db.byId('tickets', ticketId);
+  if (t.techReview?.status === 'pendente') throw new Error('Já existe uma análise pendente neste chamado.');
+  const updated = updateTicket(ticketId, {
+    techReview: {
+      requestedBy: actor.id, assignedTo: suporteId,
+      note: (note || '').trim(), response: '', status: 'pendente', at: nowISO(),
+    },
+  });
+  logAudit(t.groupId, actor.id, 'ticket.analise_tecnica', `#${t.number || ''} enviado para análise do suporte.`);
+  if (suporteId && suporteId !== actor.id)
+    notify(t.groupId, suporteId, 'analise', `🔎 Análise técnica solicitada no chamado "${t.title}".`, ticketId);
+  return updated;
+}
+
+export function respondTechReview(ticketId, response, actor) {
+  const t = db.byId('tickets', ticketId);
+  if (!t.techReview || t.techReview.status !== 'pendente') throw new Error('Não há análise pendente.');
+  if (t.techReview.assignedTo !== actor.id && roleInGroup(t.groupId, actor.id, actor.role) !== 'suporte')
+    throw new Error('Apenas o suporte designado pode responder a análise.');
+  const updated = updateTicket(ticketId, {
+    techReview: { ...t.techReview, response: (response || '').trim(), status: 'respondida', respondedAt: nowISO() },
+  });
+  logAudit(t.groupId, actor.id, 'ticket.analise_respondida', `Análise técnica de #${t.number || ''} respondida.`);
+  if (t.techReview.requestedBy && t.techReview.requestedBy !== actor.id)
+    notify(t.groupId, t.techReview.requestedBy, 'analise', `✅ O suporte respondeu a análise do chamado "${t.title}".`, ticketId);
+  return updated;
 }
 
 export function setUrgency(id, urgency, actor) {
@@ -590,6 +1003,8 @@ export function toggleUrgentAlert(id, on, actor) {
 }
 
 export function sendToReview(id, actor) {
+  if (openChildTickets(id).length > 0)
+    throw new Error('Este chamado tem subchamados abertos. Conclua as etapas antes de enviar para análise.');
   const t = updateTicket(id, { status: 'em_analise' });
   logAudit(t.groupId, actor?.id, 'ticket.analise', `#${id.slice(-4)} enviado para análise.`);
   const req = ticketRequesterId(t);
@@ -616,8 +1031,9 @@ export function rejectReview(id, actor) {
 
 // Reabrir um chamado encerrado — exclusivo do suporte (evita travar o chamado por engano).
 export function reopenTicket(id, actor) {
-  if (actor.role !== 'suporte') throw new Error('Apenas o suporte pode reabrir um chamado encerrado.');
   const current = db.byId('tickets', id);
+  if (roleInGroup(current?.groupId, actor.id, actor.role) !== 'suporte')
+    throw new Error('Apenas o suporte pode reabrir um chamado encerrado.');
   const t = updateTicket(id, { status: current?.assignedTo ? 'em_andamento' : 'aberto' });
   logAudit(t.groupId, actor.id, 'ticket.reaberto', `#${id.slice(-4)} reaberto pelo suporte.`);
   notifyTicketParties(t, actor.id, 'status', `O chamado "${t.title}" foi reaberto pelo suporte.`);
@@ -793,6 +1209,7 @@ export function requesterStats(groupId, userId) {
 
 export function citiesInGroup(groupId) {
   const set = new Set();
+  db.filter('cities', (c) => c.groupId === groupId).forEach((c) => set.add(c.name));
   db.filter('tickets', (t) => t.groupId === groupId).forEach((t) => t.cidade && set.add(t.cidade));
   db.filter('clients', (c) => c.groupId === groupId).forEach((c) => c.cidade && set.add(c.cidade));
   return [...set].sort();
@@ -846,8 +1263,9 @@ export function channelUnread(groupId, userId, channel) {
 }
 
 // Canais visíveis ao usuário: 'geral' + categorias.
-// O suporte vê todas; o desenvolvedor vê apenas as categorias em que atua.
+// Suporte vê todas; dev vê as categorias em que atua; solicitante não vê canais (só DMs).
 export function channelsForUser(group, user) {
+  if (user.role === 'solicitante') return [];
   const cats = categoriesForGroup(group.id);
   const geral = { id: 'geral', name: 'Geral', icon: '💬' };
   if (user.role === 'suporte') {
@@ -860,7 +1278,63 @@ export function channelsForUser(group, user) {
   ];
 }
 
+// ------------------------------------------------------------
+//  CONVERSAS INDIVIDUAIS (DM) — v0.0.5
+//  Reutilizam internalMessages com channel = 'dm:<idA>:<idB>' (ordenado).
+// ------------------------------------------------------------
+export function dmChannelId(userA, userB) {
+  return `dm:${[userA, userB].sort().join(':')}`;
+}
+
+// Com quem o usuário pode conversar: todos os demais membros do grupo.
+export function dmContacts(group, user) {
+  return groupMembers(group).filter((m) => m.userId !== user.id);
+}
+
+export function dmUnreadFrom(group, user, otherId) {
+  return channelUnread(group.id, user.id, dmChannelId(user.id, otherId));
+}
+
 export function internalUnreadTotal(group, user) {
-  return channelsForUser(group, user)
+  const channels = channelsForUser(group, user)
     .reduce((sum, ch) => sum + channelUnread(group.id, user.id, ch.id), 0);
+  const dms = dmContacts(group, user)
+    .reduce((sum, m) => sum + dmUnreadFrom(group, user, m.userId), 0);
+  return channels + dms;
+}
+
+// ------------------------------------------------------------
+//  PREFERÊNCIAS DO PAINEL (v0.0.5) — widgets escolhidos pelo usuário
+// ------------------------------------------------------------
+// Widgets disponíveis por perfil (solicitante tem um conjunto próprio)
+export const DASH_WIDGETS_TECH = [
+  { key: 'kpis', label: 'Indicadores (KPIs)' },
+  { key: 'serie', label: 'Chamados criados (linha do tempo)' },
+  { key: 'status', label: 'Distribuição por status' },
+  { key: 'urgencia', label: 'Por urgência e categoria' },
+  { key: 'equipe', label: 'Carga da equipe' },
+  { key: 'sla', label: 'Situação de SLA' },
+  { key: 'recentes', label: 'Atividade recente' },
+];
+export const DASH_WIDGETS_REQUESTER = [
+  { key: 'kpis', label: 'Meus números' },
+  { key: 'serie', label: 'Meus chamados (linha do tempo)' },
+  { key: 'status', label: 'Distribuição por status' },
+  { key: 'recentes', label: 'Atividade recente' },
+];
+
+export function dashWidgetsFor(role) {
+  return role === 'solicitante' ? DASH_WIDGETS_REQUESTER : DASH_WIDGETS_TECH;
+}
+
+export function getDashPrefs(groupId, userId, role) {
+  const rec = db.find('prefs', (p) => p.groupId === groupId && p.userId === userId && p.kind === 'dashboard');
+  if (rec) return rec.widgets;
+  return dashWidgetsFor(role).map((w) => w.key); // padrão: tudo ligado
+}
+
+export function saveDashPrefs(groupId, userId, widgets) {
+  const rec = db.find('prefs', (p) => p.groupId === groupId && p.userId === userId && p.kind === 'dashboard');
+  if (rec) return db.update('prefs', rec.id, { widgets });
+  return db.insert('prefs', { id: uid('prf'), groupId, userId, kind: 'dashboard', widgets });
 }

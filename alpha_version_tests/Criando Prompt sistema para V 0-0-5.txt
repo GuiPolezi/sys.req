@@ -1,0 +1,65 @@
+Criando Prompt sistema
+
+Estamos na versão 0.0.4 do sistema, a atualização da 0.0.3 para a 0.0.4 envolveu apenas reformulação do design e layout do sistema, ficou ótimo o design (e ainda pode ser melhorado)
+
+Testes foram realizados nesta versão e, juntamente de minha equipe, fizemos algumas validações e comentários sobre o que deve ser melhorado/modificado/corrigido.
+
+Irei repassar aqui exatamente o que escrevemos, depois irei dar o devido contexto e como deve ser modificado. Para que a versão nova saia conforme pensamos.
+
+
+Sys.Req - Geração de Ideias
+"Recomendações para o sistema"
+
+Na criação de conta: 
+- Não ter mais essa criação de usuário suporte/dev/solicitante. Deve-se ter apenas um cadastro, depois no grupo configura se o usuário sera suporte/dev/solicitante.
+- Aqui deve ser pensado bem antes de ser desenvolvido, pois não pode haver problemas. Basicamente o que queremos é que o solicitante crie sua conta e já possa criar chamados - então a ideia de código é ótima. Mas também gostaríamos de poder definir o técnico como suporte ou dev através da configuração do grupo
+
+Dashboard (Página Painel):
+- Atualmente temos um dashboard para os técnicos - para os solicitantes também existe e se não me engano é um pouco diferente.
+- Queremos que o Painel seja personalizável para o usuário. Que ele possa escolher qual tipo de informação/gráfico ele quer.
+Lembrando que o tipo de personalização para o solicitante deve ser diferente dos técnicos.
+
+Para os Chamados (tickets)
+- Ele deve ter um id e data de criação. Na página de visualização dos chamados deve ter filtragem por id do ticket (então na lista também deve mostrar o id do ticket, filtragem por data de criação e técnico.
+
+
+Na questão do chat do sistema.
+- Temos chat geral e chat por categoria. Deve-se haver um chat individual para os usuários poderem conversar.
+
+Acesso aos usuários do grupo
+- No sistema queremos ter acesso aos usuários do grupo para poder acessar perfil e editar perfil (alterar, senha por exemplo)
+Acredito que um bom local para essa funcionalidade, seria a página Equipe: Nesta página temos 3 abas, visualização dos técnicos e solicitantes. Penso que, nessa página, poderíamos clicar no usuário - técnico ou solicitante - e ver seu perfil e com isso poder realizar as devidas alterações, ou exclusão se necessário.
+O ideal é que possamos ver todos os usuários do grupo e fazer as configurações e permissões.
+
+
+## Importante: Para todos os cadastros que existirem no sistema, como por exemplo: Cadastro dos clientes, solicitantes, técnicos, chamados, etc.. TER A POSSIBILIDADE DE GERAR RELATÓRIO. Isso é estritamente essencial para nosso sistema e conseguirmos realizar apuração de dados, etc...
+
+Para a parte de chamados:
+- Na criação de um chamado gostaríamos que fosse possível gerar automaticamente um atendimento (em nosso sistema, o usuário suporte tem uma página exclusiva onde ele registra seus atendimentos, ela é ligeiramente diferente do chamado, pois se trata apenas de inserção de informação sobre o que o suporte fez no atendimento e a duvida do cliente). Então, elaborar alguma forma para que isso seja possível.
+
+Assim como existe cadastro de cliente, deve-se haver cadastro de cidade. COM ISSO, MUDAMOS AQUI ALGUNS CADASTROS NO SISTEMA, como iremos cadastrar a cidade individualmente, cadastros que tem esse campo devem ser selecionáveis (não escritos) com as opções de seleção sendo a cidade cadastradas. Gostaria que fosse possível vincular a cidade ao cliente se assim quisermos (ao solicitante também)
+
+SLA: O sistema deve ter controle de SLA, onde poderemos criar os SLAs e configurações relacionadas. Os slas devem estar relacionados com os chamados do sistema. Também deve ser possível gerar relatório de SLA.
+
+Agora, uma funcionalidade que eu vou precisar total das suas capacidades de processamento para desenvolver da melhor maneira possível:
+- Busque por ferramentas helpdesk populares na internet para servirem de referencias. Mildesk é um sistema que possui isso.
+-> Para essa funcionalidade: Quero que o sistema tenha possibilidade de criar fluxos/workflow dos tickets.
+Para tentar explicar melhor darei um exemplo que utilizaríamos com o sistema em produção: "Temos que criar tickets para um desenvolvedor para ele criar site. Ou seja, ticket para criação de website. Com esse ticket deve ser possível gerar outro (subticket) a partir dele, com o objetivo de "Checklist" do site. Então seria um ticket para criar site que gera um ticket para fazer checklist. O ticket de checklist deve ser encaminhado para o técnico do tipo SUPORTE, ele realiza o checklist e deve marcar para enviar de volta ao técnico que vai criar o site. Por fim, com o site criado, finaliza o ticket principal."
+- Para que isso funcione será necessário configurar fluxo, pois precisamos configurar para onde vai o encaminhamento do ticket, e coisas do tipo.
+
+
+Configuração de Permissões: 
+- Bloquear exclusão de chamado e limitar certas alterações. O sistema deve permitir configurar permissões dos usuários para que seja possível bloquear campos no chamados e até mesmo bloquear a exclusão deles.
+
+
+Função para os chamados sem atribuição:
+- Fazer com que o gerente dos Técnicos possa escolher a quem vai atribuir o ticket. COM ESSA FUNÇÃO ENTRA OUTRA ADIÇÃO QUE PRECISAMOS FAZER NO SISTEMA: Função para conseguir marcar técnicos como gerentes.
+
+Descrevendo mais uma organização que precisamos ter:
+- Chamados devem poder ser encaminhados para a analise. Com isso, a analise é enviada para o técnico do tipo suporte. O suporte deve poder responder a analise e retornar ao técnico dev (ou do chamado)
+Essa é outra organização que vai depender de criação de fluxos. Extremamente importante.
+
+
+Essa é toda a descrição que obtivemos da versão 0.0.4. Ela não esta totalmente completa e organizada para detalhar exatamente o que precisa ser feito. Mas preciso de todas essas alterações no sistema, pois irá complementar bastante para o trabalho.
+
+Desenvolva, utilizando todas as capacidades de processamento e busque entender melhores maneiras de desenvolver sem quebrar lógicas ou funções.

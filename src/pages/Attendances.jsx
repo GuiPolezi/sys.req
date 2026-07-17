@@ -3,8 +3,9 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/store';
 import {
   registerAttendance, attendancesForGroup, attendancesByTech,
-  clientsForGroup, createClient, updateClient, deleteClient,
+  clientsForGroup, createClient, updateClient, deleteClient, cityList,
 } from '../lib/domain';
+import { downloadCSV, fmtDate } from '../lib/report';
 import { Avatar, Empty, Modal, ConfirmModal } from '../components/ui';
 import { ColumnChart } from '../components/Charts';
 
@@ -58,10 +59,19 @@ export default function Attendances() {
     <div>
       <div className="row between wrap page-head" style={{ gap: 10 }}>
         <div>
-          <h1>🗒️ Registro de atendimentos</h1>
+          <h1>Registro de atendimentos</h1>
           <p className="muted">Atendimentos feitos fora de um chamado (visita, telefone, presencial…).</p>
         </div>
-        <button className="btn-primary" onClick={() => setOpen(true)}>➕ Registrar atendimento</button>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn-sm" onClick={() => downloadCSV('atendimentos', all.map((a) => ({
+            Data: fmtDate(a.at),
+            'Técnico': db.byId('users', a.userId)?.name || '',
+            Cliente: a.client || (a.ticketId ? `Chamado #${db.byId('tickets', a.ticketId)?.number || ''}` : ''),
+            Cidade: a.cidade || '',
+            'Descrição': a.note || '',
+          })))}>Gerar relatório</button>
+          <button className="btn-primary" onClick={() => setOpen(true)}>Registrar atendimento</button>
+        </div>
       </div>
 
       <div className="auth-tabs" style={{ maxWidth: 520 }}>
@@ -154,6 +164,20 @@ export default function Attendances() {
           onClose={() => setOpen(false)} onSaved={() => { setOpen(false); setSelected(ymd(new Date())); bump(); }} />
       )}
     </div>
+  );
+}
+
+// Campo de cidade: seleção quando há cidades cadastradas (v0.0.5)
+function CityField({ groupId, value, onChange }) {
+  const cities = cityList(groupId);
+  if (!cities.length) {
+    return <input value={value} onChange={(e) => onChange(e.target.value)} placeholder="Cidade" />;
+  }
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">— Cidade —</option>
+      {cities.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+    </select>
   );
 }
 
@@ -276,7 +300,7 @@ function Clients({ group, user, bump }) {
               placeholder="Ex.: Cartório 1º Ofício" autoFocus /></div>
           <div className="row" style={{ gap: 10 }}>
             <div className="field" style={{ flex: 1 }}><label>Cidade</label>
-              <input value={editing.cidade} onChange={(e) => setEditing({ ...editing, cidade: e.target.value })} placeholder="Ex.: Itajubá" /></div>
+              <CityField groupId={group.id} value={editing.cidade} onChange={(v) => setEditing({ ...editing, cidade: v })} /></div>
             <div className="field" style={{ flex: 1 }}><label>Contato</label>
               <input value={editing.contact} onChange={(e) => setEditing({ ...editing, contact: e.target.value })} placeholder="Telefone / e-mail" /></div>
           </div>
@@ -358,7 +382,7 @@ function RegisterModal({ group, user, clients, onClose, onSaved }) {
               <input value={form.client} onChange={set('client')} placeholder="Nome do cliente" autoFocus />
             </div>
             <div className="field" style={{ flex: 1, marginBottom: 0 }}>
-              <input value={form.cidade} onChange={set('cidade')} placeholder="Cidade" />
+              <CityField groupId={group.id} value={form.cidade} onChange={(v) => setForm({ ...form, cidade: v })} />
             </div>
           </div>
         )}
