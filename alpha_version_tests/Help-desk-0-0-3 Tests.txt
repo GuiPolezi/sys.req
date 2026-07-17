@@ -1,0 +1,27 @@
+Help-desk-0-0-3 Tests
+
+Resetando todas as informações do sistema;
+Criando novos usuários
+
+suporte
+------------------
+Login> guidon
+senha: gui123
+
+Solicitante
+--------------------
+login> solicito
+senha> sol123
+
+Desenvolvedor
+-------------------
+login: dev
+senha: dev123
+
+Verificando se Problema com Cadastro de solicitante foi corrigido
+-> Corrigido!!!
+
+
+Aparentemente, foi melhorado tudo o que havia no 0.2
+Esta melhor o sistema e mais organizado.
+Não prosseguirei com testes, apenas a mudança do layout para atualizar para a versão 0.4
