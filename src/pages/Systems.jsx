@@ -50,7 +50,7 @@ export default function Systems() {
         <button className="btn-primary" onClick={() => { setError(''); setEditing({ name: '', categoryId: '' }); }}>➕ Novo sistema</button>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))' }}>
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
         {systems.length === 0 && <div className="card"><Empty>Nenhum sistema cadastrado.</Empty></div>}
         {systems.map((s) => {
           const cat = s.categoryId ? db.byId('categories', s.categoryId) : null;
